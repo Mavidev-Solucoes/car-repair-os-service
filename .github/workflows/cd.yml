@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: cd-${{ github.event.workflow_run.head_branch }}
+  group: cd-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
 jobs:
