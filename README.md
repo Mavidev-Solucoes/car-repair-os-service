@@ -30,3 +30,11 @@ Microservice extracted from `car-repair-app` for the Customer, Vehicle, ServiceO
 1. Configure `ConnectionStrings:DefaultConnection` via user secrets or environment variables.
 2. Run `dotnet build /home/runner/work/car-repair-os-service/car-repair-os-service/CarRepairOsService.sln`.
 3. Run the API project with `dotnet run --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.
+
+## CI / SonarCloud required GitHub Secrets
+
+Configure the following repository secrets before running `.github/workflows/ci.yml`:
+
+- `SONAR_TOKEN`: SonarCloud token with permission to analyze the project.
+- `SONAR_PROJECT_KEY`: SonarCloud project key.
+- `SONAR_ORGANIZATION`: SonarCloud organization key.

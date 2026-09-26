@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: 8.0.x
+  SOLUTION_PATH: CarRepairOsService.sln
+  COVERAGE_THRESHOLD: 80
+  SONAR_HOST_URL: https://sonarcloud.io
+
+jobs:
+  ci:
+    name: Restore, Build, Test, Coverage, Sonar, Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+
+      - name: 1. Restore
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: 2. Build
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+
+      - name: 3. Unit Tests
+        run: |
+          dotnet test ${{ env.SOLUTION_PATH }} \
+            --configuration Release \
+            --no-build \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory ./TestResults \
+            /p:CollectCoverage=true \
+            /p:CoverletOutput=./TestResults/Coverage/ \
+            /p:CoverletOutputFormat="opencover,cobertura"
+
+      - name: 4. Generate Code Coverage Report
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool
+          reportgenerator \
+            -reports:"TestResults/**/coverage.cobertura.xml" \
+            -targetdir:"TestResults/CoverageReport" \
+            -reporttypes:"Cobertura;TextSummary"
+
+      - name: 4. Enforce minimum coverage (80%)
+        run: |
+          if [ ! -f "TestResults/CoverageReport/Cobertura.xml" ]; then
+            echo "Coverage report not found at TestResults/CoverageReport/Cobertura.xml"
+            exit 1
+          fi
+
+          python - <<'PY'
+import os
+import xml.etree.ElementTree as ET
+
+threshold = float(os.environ["COVERAGE_THRESHOLD"])
+report_path = "TestResults/CoverageReport/Cobertura.xml"
+
+line_rate = float(ET.parse(report_path).getroot().attrib.get("line-rate", 0.0))
+coverage = line_rate * 100
+
+print(f"Computed line coverage: {coverage:.2f}%")
+if coverage < threshold:
+    raise SystemExit(f"Coverage {coverage:.2f}% is below threshold {threshold:.2f}%")
+PY
+
+      - name: 5. Validate SonarCloud secrets
+        run: |
+          [ -n "${{ secrets.SONAR_TOKEN }}" ] || (echo "Missing SONAR_TOKEN secret" && exit 1)
+          [ -n "${{ secrets.SONAR_PROJECT_KEY }}" ] || (echo "Missing SONAR_PROJECT_KEY secret" && exit 1)
+          [ -n "${{ secrets.SONAR_ORGANIZATION }}" ] || (echo "Missing SONAR_ORGANIZATION secret" && exit 1)
+
+      - name: 5. SonarQube Analysis (begin)
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+          dotnet sonarscanner begin \
+            /k:"${{ secrets.SONAR_PROJECT_KEY }}" \
+            /o:"${{ secrets.SONAR_ORGANIZATION }}" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.host.url="${{ env.SONAR_HOST_URL }}" \
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.cs.vstest.reportsPaths="TestResults/**/*.trx" \
+            /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
+
+      - name: 5. SonarQube Analysis (build)
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+
+      - name: 5. SonarQube Analysis (end)
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
+      - name: 6. Docker Build Validation
+        run: docker build --file src/Api/Dockerfile --tag car-repair-os-service:ci .
