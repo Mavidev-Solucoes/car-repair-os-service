@@ -43,6 +43,7 @@ jobs:
 
       - name: Compute image name
         id: image
+        shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
