@@ -40,6 +40,39 @@ public class ServiceOrderDomainEventsTests
         Assert.Equal(assignedUserId, closedEvent.ClosedByUserId);
     }
 
+    [Fact]
+    public void Close_AfterCancel_ShouldThrowInvalidOperationException()
+    {
+        var serviceOrder = CreateServiceOrder(out var assignedUserId);
+        serviceOrder.Cancel(assignedUserId);
+
+        var act = () => serviceOrder.Close(assignedUserId);
+
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
+    public void Cancel_AfterClose_ShouldThrowInvalidOperationException()
+    {
+        var serviceOrder = CreateServiceOrder(out var assignedUserId);
+        serviceOrder.Close(assignedUserId);
+
+        var act = () => serviceOrder.Cancel(assignedUserId);
+
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
+    public void Close_WhenAlreadyClosed_ShouldThrowInvalidOperationException()
+    {
+        var serviceOrder = CreateServiceOrder(out var assignedUserId);
+        serviceOrder.Close(assignedUserId);
+
+        var act = () => serviceOrder.Close(assignedUserId);
+
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
     private static ServiceOrder CreateServiceOrder(out Guid assignedUserId)
     {
         assignedUserId = Guid.NewGuid();
