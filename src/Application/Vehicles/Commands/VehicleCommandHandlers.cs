@@ -1,4 +1,5 @@
 using Application.Common.Exceptions;
+using Application.Common.Interfaces;
 using Application.DTOs;
 using AutoMapper;
 using Domain.Entities;
@@ -13,13 +14,15 @@ public class CreateVehicleCommandHandler : IRequestHandler<CreateVehicleCommand,
     private readonly ICustomerRepository _customerRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateVehicleCommandHandler(IVehicleRepository vehicleRepository, ICustomerRepository customerRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public CreateVehicleCommandHandler(IVehicleRepository vehicleRepository, ICustomerRepository customerRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _vehicleRepository = vehicleRepository;
         _customerRepository = customerRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<VehicleDto> Handle(CreateVehicleCommand request, CancellationToken cancellationToken)
@@ -32,7 +35,7 @@ public class CreateVehicleCommandHandler : IRequestHandler<CreateVehicleCommand,
             throw new BusinessException($"A vehicle with license plate '{request.LicensePlate}' already exists.");
         }
 
-        var vehicle = new Vehicle(request.CustomerId, request.Brand, request.Model, request.Year, request.LicensePlate, request.Color);
+        var vehicle = new Vehicle(request.CustomerId, request.Brand, request.Model, request.Year, request.LicensePlate, request.Color, _currentUserService.UserId);
         await _vehicleRepository.AddAsync(vehicle, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
         return _mapper.Map<VehicleDto>(vehicle);
@@ -44,12 +47,14 @@ public class UpdateVehicleCommandHandler : IRequestHandler<UpdateVehicleCommand,
     private readonly IVehicleRepository _vehicleRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateVehicleCommandHandler(IVehicleRepository vehicleRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public UpdateVehicleCommandHandler(IVehicleRepository vehicleRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _vehicleRepository = vehicleRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<VehicleDto> Handle(UpdateVehicleCommand request, CancellationToken cancellationToken)
@@ -64,7 +69,7 @@ public class UpdateVehicleCommandHandler : IRequestHandler<UpdateVehicleCommand,
             throw new BusinessException($"A vehicle with license plate '{request.LicensePlate}' already exists.");
         }
 
-        vehicle.Update(request.Brand, request.Model, request.Year, request.LicensePlate, request.Color);
+        vehicle.Update(request.Brand, request.Model, request.Year, request.LicensePlate, request.Color, _currentUserService.UserId);
         _vehicleRepository.Update(vehicle);
         await _unitOfWork.CommitAsync(cancellationToken);
         return _mapper.Map<VehicleDto>(vehicle);

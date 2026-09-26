@@ -1,4 +1,5 @@
 using Application.Common.Exceptions;
+using Application.Common.Interfaces;
 using Application.DTOs;
 using AutoMapper;
 using Domain.Entities;
@@ -12,12 +13,14 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
     private readonly ICustomerRepository _customerRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateCustomerCommandHandler(ICustomerRepository customerRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public CreateCustomerCommandHandler(ICustomerRepository customerRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _customerRepository = customerRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<CustomerDto> Handle(CreateCustomerCommand request, CancellationToken cancellationToken)
@@ -32,7 +35,7 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
             throw new BusinessException($"A customer with email '{request.Email}' already exists.");
         }
 
-        var customer = new Customer(request.Name, request.PersonalId, request.Email, request.Telephone);
+        var customer = new Customer(request.Name, request.PersonalId, request.Email, request.Telephone, _currentUserService.UserId);
         await _customerRepository.AddAsync(customer, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
         return _mapper.Map<CustomerDto>(customer);
@@ -44,12 +47,14 @@ public class UpdateCustomerCommandHandler : IRequestHandler<UpdateCustomerComman
     private readonly ICustomerRepository _customerRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateCustomerCommandHandler(ICustomerRepository customerRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public UpdateCustomerCommandHandler(ICustomerRepository customerRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _customerRepository = customerRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<CustomerDto> Handle(UpdateCustomerCommand request, CancellationToken cancellationToken)
@@ -63,7 +68,7 @@ public class UpdateCustomerCommandHandler : IRequestHandler<UpdateCustomerComman
             throw new BusinessException($"A customer with email '{request.Email}' already exists.");
         }
 
-        customer.Update(request.Name, request.Email, request.Telephone, request.IsActive);
+        customer.Update(request.Name, request.Email, request.Telephone, request.IsActive, _currentUserService.UserId);
 
         _customerRepository.Update(customer);
         await _unitOfWork.CommitAsync(cancellationToken);

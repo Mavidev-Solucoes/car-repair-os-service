@@ -44,7 +44,7 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
 
     public async Task<(IEnumerable<Customer> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? orderBy, bool orderDescending, IEnumerable<Expression<Func<Customer, bool>>>? filters = null, CancellationToken cancellationToken = default)
     {
-        var query = Context.Customers.AsNoTracking().Include(customer => customer.Vehicles).AsQueryable();
+        var query = Context.Customers.AsNoTracking().AsQueryable();
 
         if (filters is not null)
         {

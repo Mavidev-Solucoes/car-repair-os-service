@@ -1,4 +1,5 @@
 using Application.Common.Exceptions;
+using Application.Common.Interfaces;
 using Application.DTOs;
 using AutoMapper;
 using Domain.Entities;
@@ -14,14 +15,16 @@ public class OpenServiceOrderCommandHandler : IRequestHandler<OpenServiceOrderCo
     private readonly IVehicleRepository _vehicleRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public OpenServiceOrderCommandHandler(IServiceOrderRepository serviceOrderRepository, ICustomerRepository customerRepository, IVehicleRepository vehicleRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public OpenServiceOrderCommandHandler(IServiceOrderRepository serviceOrderRepository, ICustomerRepository customerRepository, IVehicleRepository vehicleRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _serviceOrderRepository = serviceOrderRepository;
         _customerRepository = customerRepository;
         _vehicleRepository = vehicleRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ServiceOrderDto> Handle(OpenServiceOrderCommand request, CancellationToken cancellationToken)
@@ -37,7 +40,7 @@ public class OpenServiceOrderCommandHandler : IRequestHandler<OpenServiceOrderCo
             throw new BusinessException("The vehicle does not belong to the informed customer.");
         }
 
-        var serviceOrder = new ServiceOrder(request.VehicleId, request.CustomerId);
+        var serviceOrder = new ServiceOrder(request.VehicleId, request.CustomerId, _currentUserService.UserId);
         await _serviceOrderRepository.AddAsync(serviceOrder, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
         var detailed = await _serviceOrderRepository.GetWithDetailsAsync(serviceOrder.Id, cancellationToken)
@@ -51,12 +54,14 @@ public class AddServiceOrderItemCommandHandler : IRequestHandler<AddServiceOrder
     private readonly IServiceOrderRepository _serviceOrderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public AddServiceOrderItemCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public AddServiceOrderItemCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _serviceOrderRepository = serviceOrderRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ServiceOrderDto> Handle(AddServiceOrderItemCommand request, CancellationToken cancellationToken)
@@ -64,7 +69,7 @@ public class AddServiceOrderItemCommandHandler : IRequestHandler<AddServiceOrder
         var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
-        serviceOrder.AddItem(request.Description, request.UnitPrice, request.Quantity);
+        serviceOrder.AddItem(request.Description, request.UnitPrice, request.Quantity, _currentUserService.UserId);
         _serviceOrderRepository.Update(serviceOrder);
         await _unitOfWork.CommitAsync(cancellationToken);
         return _mapper.Map<ServiceOrderDto>(serviceOrder);
@@ -76,12 +81,14 @@ public class UpdateServiceOrderItemCommandHandler : IRequestHandler<UpdateServic
     private readonly IServiceOrderRepository _serviceOrderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateServiceOrderItemCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public UpdateServiceOrderItemCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _serviceOrderRepository = serviceOrderRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ServiceOrderDto> Handle(UpdateServiceOrderItemCommand request, CancellationToken cancellationToken)
@@ -89,7 +96,7 @@ public class UpdateServiceOrderItemCommandHandler : IRequestHandler<UpdateServic
         var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
-        serviceOrder.UpdateItem(request.ServiceOrderItemId, request.Description, request.UnitPrice, request.Quantity);
+        serviceOrder.UpdateItem(request.ServiceOrderItemId, request.Description, request.UnitPrice, request.Quantity, _currentUserService.UserId);
         _serviceOrderRepository.Update(serviceOrder);
         await _unitOfWork.CommitAsync(cancellationToken);
         return _mapper.Map<ServiceOrderDto>(serviceOrder);
@@ -101,12 +108,14 @@ public class RemoveServiceOrderItemCommandHandler : IRequestHandler<RemoveServic
     private readonly IServiceOrderRepository _serviceOrderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public RemoveServiceOrderItemCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public RemoveServiceOrderItemCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _serviceOrderRepository = serviceOrderRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ServiceOrderDto> Handle(RemoveServiceOrderItemCommand request, CancellationToken cancellationToken)
@@ -114,7 +123,7 @@ public class RemoveServiceOrderItemCommandHandler : IRequestHandler<RemoveServic
         var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
-        serviceOrder.RemoveItem(request.ServiceOrderItemId);
+        serviceOrder.RemoveItem(request.ServiceOrderItemId, _currentUserService.UserId);
         _serviceOrderRepository.Update(serviceOrder);
         await _unitOfWork.CommitAsync(cancellationToken);
         return _mapper.Map<ServiceOrderDto>(serviceOrder);
@@ -126,12 +135,14 @@ public class UpdateServiceOrderStatusCommandHandler : IRequestHandler<UpdateServ
     private readonly IServiceOrderRepository _serviceOrderRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateServiceOrderStatusCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper)
+    public UpdateServiceOrderStatusCommandHandler(IServiceOrderRepository serviceOrderRepository, IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService)
     {
         _serviceOrderRepository = serviceOrderRepository;
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _currentUserService = currentUserService;
     }
 
     public async Task<ServiceOrderDto> Handle(UpdateServiceOrderStatusCommand request, CancellationToken cancellationToken)
@@ -139,7 +150,7 @@ public class UpdateServiceOrderStatusCommandHandler : IRequestHandler<UpdateServ
         var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
-        serviceOrder.UpdateStatus(request.Status);
+        serviceOrder.UpdateStatus(request.Status, _currentUserService.UserId);
         _serviceOrderRepository.Update(serviceOrder);
         await _unitOfWork.CommitAsync(cancellationToken);
         return _mapper.Map<ServiceOrderDto>(serviceOrder);

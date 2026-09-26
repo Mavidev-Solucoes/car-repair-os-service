@@ -17,7 +17,8 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.Property(customer => customer.PersonalId)
             .IsRequired()
-            .HasMaxLength(14);
+            .HasMaxLength(14)
+            .HasComment("Normalized CPF/CNPJ digits only.");
 
         builder.Property(customer => customer.Email)
             .IsRequired()
