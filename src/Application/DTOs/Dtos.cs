@@ -9,3 +9,13 @@ public record CustomerDto(
     bool IsActive,
     DateTime CreatedAt,
     DateTime? UpdatedAt);
+
+public record VehicleDto(
+    Guid Id,
+    Guid CustomerId,
+    string Brand,
+    string Model,
+    int Year,
+    string LicensePlate,
+    string? Color,
+    DateTime CreatedAt);

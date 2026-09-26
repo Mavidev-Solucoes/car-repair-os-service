@@ -32,7 +32,7 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
     }
 
     public Task<bool> HasVehiclesAsync(Guid customerId, CancellationToken cancellationToken = default) =>
-        LegacyTableHasCustomerAsync("public.vehicles", "SELECT EXISTS (SELECT 1 FROM public.vehicles WHERE customer_id = @customerId)", customerId, cancellationToken);
+        Context.Vehicles.AnyAsync(vehicle => vehicle.CustomerId == customerId, cancellationToken);
 
     public Task<bool> HasServiceOrdersAsync(Guid customerId, CancellationToken cancellationToken = default) =>
         LegacyTableHasCustomerAsync("public.service_orders", "SELECT EXISTS (SELECT 1 FROM public.service_orders WHERE customer_id = @customerId)", customerId, cancellationToken);
