@@ -50,7 +50,11 @@ public static class DependencyInjection
         services.AddDbContext<CarRepairOsDbContext>(options =>
             options.UseNpgsql(
                 connectionString,
-                npgsql => npgsql.MigrationsAssembly(typeof(CarRepairOsDbContext).Assembly.FullName)));
+                npgsql =>
+                {
+                    npgsql.MigrationsAssembly(typeof(CarRepairOsDbContext).Assembly.FullName);
+                    npgsql.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
+                }));
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<CarRepairOsDbContext>());
         services.AddScoped<ICustomerRepository, CustomerRepository>();

@@ -6,6 +6,7 @@ using Api.Middleware;
 using Api;
 using Api.HealthChecks;
 using Infrastructure.Messaging;
+using AutoMapper;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -58,6 +59,12 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var mapper = scope.ServiceProvider.GetRequiredService<IMapper>();
+    mapper.ConfigurationProvider.AssertConfigurationIsValid();
+}
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -66,7 +73,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+var enableHttpsRedirection = app.Configuration.GetValue("HttpsRedirection:Enabled", false);
+if (enableHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
 app.MapControllers();
 app.MapHealthChecks("/health");
 

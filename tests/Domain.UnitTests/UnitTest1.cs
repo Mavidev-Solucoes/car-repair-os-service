@@ -103,9 +103,77 @@ public class ServiceOrderDomainEventsTests
         Assert.Equal(initialEventCount, serviceOrder.DomainEvents.Count);
     }
 
+    [Fact]
+    public void AddServiceItem_ShouldUpdateTotalPrice_AndTransitionToDiagnosing()
+    {
+        var serviceOrder = CreateServiceOrder(out var assignedUserId);
+        serviceOrder.ClearDomainEvents();
+        var item = new ServiceOrderItem(serviceOrder.Id, Guid.NewGuid(), " Brake pad replacement ", 120.50m, 2, assignedUserId);
+
+        serviceOrder.AddServiceItem(item, assignedUserId);
+
+        Assert.Equal(241.00m, serviceOrder.TotalPrice);
+        Assert.Equal(Domain.Enums.ServiceStatus.Diagnosing, serviceOrder.Status);
+        Assert.Collection(
+            serviceOrder.StatusHistory,
+            initial =>
+            {
+                Assert.Null(initial.FromStatus);
+                Assert.Equal(Domain.Enums.ServiceStatus.Received, initial.ToStatus);
+            },
+            transition =>
+            {
+                Assert.Equal(Domain.Enums.ServiceStatus.Received, transition.FromStatus);
+                Assert.Equal(Domain.Enums.ServiceStatus.Diagnosing, transition.ToStatus);
+                Assert.Equal(assignedUserId, transition.ChangedByUserId);
+            });
+    }
+
+    [Fact]
+    public void AddServiceItem_WithDifferentUser_ShouldThrowInvalidOperationException()
+    {
+        var serviceOrder = CreateServiceOrder(out _);
+        var item = new ServiceOrderItem(serviceOrder.Id, Guid.NewGuid(), "Inspection", 10m, 1);
+
+        var act = () => serviceOrder.AddServiceItem(item, Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
     private static ServiceOrder CreateServiceOrder(out Guid assignedUserId)
     {
         assignedUserId = Guid.NewGuid();
         return new ServiceOrder(Guid.NewGuid(), Guid.NewGuid(), assignedUserId);
+    }
+}
+
+public class CustomerEntityTests
+{
+    [Fact]
+    public void Constructor_ShouldNormalizeCustomerFields_AndRaiseDomainEvent()
+    {
+        var customer = new Customer("  Maria   Silva  ", "123.456.789-09", " USER@Example.COM ", "(11) 99999-0000");
+
+        Assert.Equal("Maria Silva", customer.Name);
+        Assert.Equal("12345678909", customer.PersonalId);
+        Assert.Equal("user@example.com", customer.Email);
+        Assert.Equal("11999990000", customer.Telephone);
+        Assert.True(customer.IsActive);
+        Assert.Single(customer.DomainEvents.OfType<CustomerCreatedDomainEvent>());
+    }
+}
+
+public class VehicleEntityTests
+{
+    [Fact]
+    public void Update_ShouldNormalizeLicensePlate()
+    {
+        var vehicle = new Vehicle(Guid.NewGuid(), "Ford", "Ka", 2020, "abc-1234");
+
+        vehicle.Update("Ford", "Ka", 2021, "def-5678", "Black");
+
+        Assert.Equal("DEF5678", vehicle.LicensePlate);
+        Assert.Equal(2021, vehicle.Year);
+        Assert.Equal("Black", vehicle.Color);
     }
 }

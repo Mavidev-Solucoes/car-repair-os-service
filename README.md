@@ -27,9 +27,18 @@ Microservice extracted from `car-repair-app` for the Customer, Vehicle, ServiceO
 
 ## Running locally
 
-1. Configure `ConnectionStrings:DefaultConnection` via user secrets or environment variables.
-2. Run `dotnet build /home/runner/work/car-repair-os-service/car-repair-os-service/CarRepairOsService.sln`.
-3. Run the API project with `dotnet run --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.
+1. Configure `ConnectionStrings__DefaultConnection` or the `Database__*` environment variables.
+2. Optionally configure `RabbitMq__*` environment variables for broker connectivity.
+3. Run `dotnet ef database update --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Infrastructure/Infrastructure.csproj --startup-project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.
+4. Run `dotnet build /home/runner/work/car-repair-os-service/car-repair-os-service/CarRepairOsService.sln`.
+5. Run the API project with `dotnet run --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.
+
+## Environment variables
+
+- `ConnectionStrings__DefaultConnection`: full PostgreSQL connection string override.
+- `Database__Host`, `Database__Port`, `Database__Database`, `Database__Username`, `Database__Password`, `Database__IncludeErrorDetail`: discrete database settings used when the connection string is absent.
+- `RabbitMq__HostName`, `RabbitMq__Port`, `RabbitMq__UserName`, `RabbitMq__Password`, `RabbitMq__VirtualHost`, `RabbitMq__ExchangeName`, `RabbitMq__MaxRetries`, `RabbitMq__RetryDelayMilliseconds`: RabbitMQ settings.
+- `HttpsRedirection__Enabled`: enables HTTPS redirection when the runtime environment terminates TLS.
 
 ## CI / SonarCloud required GitHub Secrets
 
