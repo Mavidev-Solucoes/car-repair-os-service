@@ -24,8 +24,11 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
         }
 
         var context = new ValidationContext<TRequest>(request);
-        var validationResults = await Task.WhenAll(
-            _validators.Select(validator => validator.ValidateAsync(context, cancellationToken)));
+        var validationResults = new List<FluentValidation.Results.ValidationResult>();
+        foreach (var validator in _validators)
+        {
+            validationResults.Add(await validator.ValidateAsync(context, cancellationToken));
+        }
 
         var failures = validationResults
             .SelectMany(result => result.Errors)
