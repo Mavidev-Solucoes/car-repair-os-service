@@ -111,7 +111,7 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
         }
         finally
         {
-            if (shouldCloseConnection)
+            if (shouldCloseConnection && Context.Database.CurrentTransaction is null)
             {
                 await connection.CloseAsync();
             }
