@@ -92,6 +92,16 @@ public class DeleteCustomerCommandHandler : IRequestHandler<DeleteCustomerComman
         var customer = await _customerRepository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Customer), request.Id);
 
+        if (await _customerRepository.HasServiceOrdersAsync(request.Id, cancellationToken))
+        {
+            throw new BusinessException("This customer cannot be deleted because it has related service orders.");
+        }
+
+        if (await _customerRepository.HasVehiclesAsync(request.Id, cancellationToken))
+        {
+            throw new BusinessException("This customer cannot be deleted because it still has registered vehicles.");
+        }
+
         _customerRepository.Delete(customer);
         await _unitOfWork.CommitAsync(cancellationToken);
         return Unit.Value;

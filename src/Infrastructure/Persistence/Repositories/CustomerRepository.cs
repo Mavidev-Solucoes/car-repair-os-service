@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Data;
 using Domain.Entities;
 using Domain.Interfaces.Repositories;
 using Domain.ValueObjects;
@@ -29,6 +30,12 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
         var normalized = email.Trim().ToLowerInvariant();
         return await Context.Customers.AnyAsync(customer => customer.Email == normalized, cancellationToken);
     }
+
+    public Task<bool> HasVehiclesAsync(Guid customerId, CancellationToken cancellationToken = default) =>
+        LegacyTableHasCustomerAsync("public.vehicles", "SELECT EXISTS (SELECT 1 FROM public.vehicles WHERE customer_id = @customerId)", customerId, cancellationToken);
+
+    public Task<bool> HasServiceOrdersAsync(Guid customerId, CancellationToken cancellationToken = default) =>
+        LegacyTableHasCustomerAsync("public.service_orders", "SELECT EXISTS (SELECT 1 FROM public.service_orders WHERE customer_id = @customerId)", customerId, cancellationToken);
 
     public async Task<(IEnumerable<Customer> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? orderBy, bool orderDescending, IEnumerable<Expression<Func<Customer, bool>>>? filters = null, CancellationToken cancellationToken = default)
     {
@@ -61,4 +68,48 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
             "createdat" => orderDescending ? query.OrderByDescending(customer => customer.CreatedAt) : query.OrderBy(customer => customer.CreatedAt),
             _ => query.OrderBy(customer => customer.Name)
         };
+
+    private async Task<bool> LegacyTableHasCustomerAsync(string tableName, string existsSql, Guid customerId, CancellationToken cancellationToken)
+    {
+        var connection = Context.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+        if (shouldCloseConnection)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var tableCommand = connection.CreateCommand();
+            tableCommand.CommandText = "SELECT to_regclass(@tableName)";
+            var tableParameter = tableCommand.CreateParameter();
+            tableParameter.ParameterName = "tableName";
+            tableParameter.Value = tableName;
+            tableCommand.Parameters.Add(tableParameter);
+
+            var tableExists = await tableCommand.ExecuteScalarAsync(cancellationToken);
+            if (tableExists is null or DBNull)
+            {
+                return false;
+            }
+
+            await using var relationCommand = connection.CreateCommand();
+            relationCommand.CommandText = existsSql;
+            var customerParameter = relationCommand.CreateParameter();
+            customerParameter.ParameterName = "customerId";
+            customerParameter.Value = customerId;
+            relationCommand.Parameters.Add(customerParameter);
+
+            var result = await relationCommand.ExecuteScalarAsync(cancellationToken);
+            return result is true;
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
 }
