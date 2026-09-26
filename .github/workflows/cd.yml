@@ -41,19 +41,11 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image name
-        id: image
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const imageName = `ghcr.io/${context.repo.owner}/${context.repo.repo}`.toLowerCase();
-            core.setOutput('name', imageName);
-
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.image.outputs.name }}
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest
             type=raw,value=${{ github.event.workflow_run.head_sha }}
