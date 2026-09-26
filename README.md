@@ -29,9 +29,9 @@ Microservice extracted from `car-repair-app` for the Customer, Vehicle, ServiceO
 
 1. Configure `ConnectionStrings__DefaultConnection` or the `Database__*` environment variables.
 2. Optionally configure `RabbitMq__*` environment variables for broker connectivity.
-3. Run `dotnet ef database update --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Infrastructure/Infrastructure.csproj --startup-project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.
-4. Run `dotnet build /home/runner/work/car-repair-os-service/car-repair-os-service/CarRepairOsService.sln`.
-5. Run the API project with `dotnet run --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.
+3. Run `dotnet ef database update --project src/Infrastructure/Infrastructure.csproj --startup-project src/Api/Api.csproj`.
+4. Run `dotnet build CarRepairOsService.sln`.
+5. Run the API project with `dotnet run --project src/Api/Api.csproj`.
 
 ## Environment variables
 

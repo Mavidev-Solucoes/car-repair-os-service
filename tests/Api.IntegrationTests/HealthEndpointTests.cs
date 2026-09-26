@@ -9,11 +9,11 @@ public sealed class HealthEndpointTests : IClassFixture<CustomWebApplicationFact
         _httpClient = factory.CreateClient();
     }
 
-    [Fact(Skip = "Integration scenarios need containerized PostgreSQL and RabbitMQ dependencies.")]
-    public async Task HealthEndpoint_ShouldReturnSuccess_WhenDependenciesAreAvailable()
+    [Fact]
+    public async Task HealthEndpoint_ShouldReturnServiceUnavailable_WhenDependenciesAreUnavailable()
     {
         var response = await _httpClient.GetAsync("/health");
 
-        response.EnsureSuccessStatusCode();
+        Assert.Equal(System.Net.HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 }

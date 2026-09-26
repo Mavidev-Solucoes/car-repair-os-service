@@ -14,34 +14,47 @@ public sealed class RabbitMqHealthCheck : IHealthCheck
         _options = options.Value;
     }
 
-    public Task<HealthCheckResult> CheckHealthAsync(
+    public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
+        if (!_options.Enabled)
+        {
+            return HealthCheckResult.Healthy("RabbitMQ health check is disabled.");
+        }
+
         try
         {
-            var factory = new ConnectionFactory
+            return await Task.Run(() =>
             {
-                HostName = _options.HostName,
-                Port = _options.Port,
-                UserName = _options.UserName,
-                Password = _options.Password,
-                VirtualHost = _options.VirtualHost,
-                DispatchConsumersAsync = true,
-                RequestedConnectionTimeout = TimeSpan.FromSeconds(5)
-            };
+                cancellationToken.ThrowIfCancellationRequested();
 
-            using var connection = factory.CreateConnection();
-            using var channel = connection.CreateModel();
+                var factory = new ConnectionFactory
+                {
+                    HostName = _options.HostName,
+                    Port = _options.Port,
+                    UserName = _options.UserName,
+                    Password = _options.Password,
+                    VirtualHost = _options.VirtualHost,
+                    DispatchConsumersAsync = true,
+                    RequestedConnectionTimeout = TimeSpan.FromSeconds(5)
+                };
 
-            return Task.FromResult(
-                connection.IsOpen && channel.IsOpen
+                using var connection = factory.CreateConnection();
+                using var channel = connection.CreateModel();
+
+                return connection.IsOpen && channel.IsOpen
                     ? HealthCheckResult.Healthy("RabbitMQ connection is available.")
-                    : HealthCheckResult.Unhealthy("RabbitMQ connection is unavailable."));
+                    : HealthCheckResult.Unhealthy("RabbitMQ connection is unavailable.");
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            return Task.FromResult(HealthCheckResult.Unhealthy("RabbitMQ connection failed.", exception));
+            return HealthCheckResult.Unhealthy("RabbitMQ connection failed.", exception);
         }
     }
 }
