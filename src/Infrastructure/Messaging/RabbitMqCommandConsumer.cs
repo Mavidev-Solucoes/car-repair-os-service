@@ -10,6 +10,8 @@ namespace Infrastructure.Messaging;
 public class RabbitMqCommandConsumer : ICommandConsumer
 {
     private const string RetryCountHeader = "x-retry-count";
+    private const string RetrySuffix = ".retry";
+    private const string DeadLetterSuffix = ".dlq";
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly IRabbitMqConnectionProvider _connectionProvider;
     private readonly RabbitMqOptions _options;
@@ -20,14 +22,16 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         _options = options.Value;
     }
 
-    public async Task StartConsumingAsync<TCommand>(
+    public Task<IAsyncDisposable> StartConsumingAsync<TCommand>(
         string queueName,
         string routingKey,
         Func<MessageEnvelope<TCommand>, CancellationToken, Task> handler,
         CancellationToken cancellationToken = default)
         where TCommand : class
     {
-        using var channel = _connectionProvider.CreateChannel();
+        var linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var processingToken = linkedCancellationTokenSource.Token;
+        var channel = _connectionProvider.CreateChannel();
         var channelLock = new object();
         DeclareTopology(channel, queueName, routingKey);
 
@@ -42,10 +46,17 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                 var message = JsonSerializer.Deserialize<MessageEnvelope<TCommand>>(json, SerializerOptions)
                     ?? throw new InvalidOperationException("Invalid RabbitMQ message payload.");
 
-                await handler(message, cancellationToken);
+                await handler(message, processingToken);
                 lock (channelLock)
                 {
                     channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                }
+            }
+            catch (OperationCanceledException) when (processingToken.IsCancellationRequested)
+            {
+                lock (channelLock)
+                {
+                    channel.BasicNack(eventArgs.DeliveryTag, multiple: false, requeue: true);
                 }
             }
             catch
@@ -70,23 +81,16 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         };
 
         var consumerTag = channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        using var registration = cancellationToken.Register(() => completion.TrySetResult());
-
-        await completion.Task;
-        lock (channelLock)
-        {
-            channel.BasicCancel(consumerTag);
-        }
+        IAsyncDisposable subscription = new RabbitMqConsumerSubscription(channel, channelLock, consumerTag, linkedCancellationTokenSource);
+        return Task.FromResult(subscription);
     }
 
     private void DeclareTopology(IModel channel, string queueName, string routingKey)
     {
         var retryExchangeName = GetRetryExchangeName();
         var deadLetterExchangeName = GetDeadLetterExchangeName();
-        var retryQueueName = $"{queueName}.retry";
-        var deadLetterQueueName = $"{queueName}.dlq";
+        var retryQueueName = GetRetryQueueName(queueName);
+        var deadLetterQueueName = GetDeadLetterQueueName(queueName);
 
         channel.ExchangeDeclare(_options.ExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
         channel.ExchangeDeclare(retryExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
@@ -210,4 +214,52 @@ public class RabbitMqCommandConsumer : ICommandConsumer
     private string GetRetryExchangeName() => $"{_options.ExchangeName}.retry";
 
     private string GetDeadLetterExchangeName() => $"{_options.ExchangeName}.dlq";
+
+    private static string GetRetryQueueName(string queueName) => $"{queueName}{RetrySuffix}";
+
+    private static string GetDeadLetterQueueName(string queueName) => $"{queueName}{DeadLetterSuffix}";
+
+    private sealed class RabbitMqConsumerSubscription : IAsyncDisposable
+    {
+        private readonly IModel _channel;
+        private readonly object _channelLock;
+        private readonly string _consumerTag;
+        private readonly CancellationTokenSource _cancellationTokenSource;
+        private bool _disposed;
+
+        public RabbitMqConsumerSubscription(
+            IModel channel,
+            object channelLock,
+            string consumerTag,
+            CancellationTokenSource cancellationTokenSource)
+        {
+            _channel = channel;
+            _channelLock = channelLock;
+            _consumerTag = consumerTag;
+            _cancellationTokenSource = cancellationTokenSource;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            if (_disposed)
+            {
+                return ValueTask.CompletedTask;
+            }
+
+            _disposed = true;
+            _cancellationTokenSource.Cancel();
+
+            lock (_channelLock)
+            {
+                if (_channel.IsOpen)
+                {
+                    _channel.BasicCancel(_consumerTag);
+                }
+            }
+
+            _channel.Dispose();
+            _cancellationTokenSource.Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
 }

@@ -16,6 +16,7 @@ public class RabbitMqEventPublisher : IEventPublisher
     {
         _connectionProvider = connectionProvider;
         _options = options.Value;
+        EnsureTopology();
     }
 
     public Task PublishAsync<TEvent>(
@@ -27,7 +28,6 @@ public class RabbitMqEventPublisher : IEventPublisher
         cancellationToken.ThrowIfCancellationRequested();
 
         using var channel = _connectionProvider.CreateChannel();
-        channel.ExchangeDeclare(_options.ExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
 
         var payload = JsonSerializer.Serialize(message, SerializerOptions);
         var body = Encoding.UTF8.GetBytes(payload);
@@ -46,5 +46,11 @@ public class RabbitMqEventPublisher : IEventPublisher
             body: body);
 
         return Task.CompletedTask;
+    }
+
+    private void EnsureTopology()
+    {
+        using var channel = _connectionProvider.CreateChannel();
+        channel.ExchangeDeclare(_options.ExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
     }
 }
