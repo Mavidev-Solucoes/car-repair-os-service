@@ -18,11 +18,13 @@ public class CarRepairOsDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfiguration(new CustomerConfiguration());
+        modelBuilder.ApplyConfiguration(new VehicleConfiguration());
     }
 
     public async Task<int> CommitAsync(CancellationToken cancellationToken = default)

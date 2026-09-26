@@ -31,6 +31,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<CarRepairOsDbContext>());
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<IVehicleRepository, VehicleRepository>();
 
         return services;
     }
