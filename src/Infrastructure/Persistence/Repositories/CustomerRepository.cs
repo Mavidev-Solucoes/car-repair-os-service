@@ -71,6 +71,11 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
 
     private async Task<bool> LegacyTableHasCustomerAsync(string tableName, string existsSql, Guid customerId, CancellationToken cancellationToken)
     {
+        if (!Context.Database.IsNpgsql())
+        {
+            return false;
+        }
+
         var connection = Context.Database.GetDbConnection();
         var shouldCloseConnection = connection.State != ConnectionState.Open;
 
@@ -102,7 +107,7 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
             relationCommand.Parameters.Add(customerParameter);
 
             var result = await relationCommand.ExecuteScalarAsync(cancellationToken);
-            return result is true;
+            return result is not null and not DBNull && Convert.ToBoolean(result);
         }
         finally
         {
