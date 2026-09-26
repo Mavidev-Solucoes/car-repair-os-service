@@ -45,12 +45,26 @@ public class ServiceOrderConfiguration : IEntityTypeConfiguration<ServiceOrder>
         builder.HasMany(serviceOrder => serviceOrder.ServiceItems)
             .WithOne()
             .HasForeignKey(item => item.ServiceOrderId)
+            .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(serviceOrder => serviceOrder.StatusHistory)
             .WithOne()
             .HasForeignKey(history => history.ServiceOrderId)
+            .IsRequired()
             .OnDelete(DeleteBehavior.Cascade);
+
+
+
+        builder.Metadata.FindNavigation(nameof(ServiceOrder.ServiceItems))!
+            .SetField("_serviceItems");
+        builder.Metadata.FindNavigation(nameof(ServiceOrder.ServiceItems))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Metadata.FindNavigation(nameof(ServiceOrder.StatusHistory))!
+            .SetField("_statusHistory");
+        builder.Metadata.FindNavigation(nameof(ServiceOrder.StatusHistory))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         builder.HasIndex(serviceOrder => serviceOrder.CustomerId);
         builder.HasIndex(serviceOrder => serviceOrder.VehicleId);

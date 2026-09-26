@@ -15,6 +15,7 @@ public class ServiceOrderRepository : Repository<ServiceOrder>, IServiceOrderRep
         => await Context.Set<ServiceOrder>()
             .Include(order => order.ServiceItems)
             .Include(order => order.StatusHistory)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(order => order.Id == id, cancellationToken);
 
     public async Task<(IEnumerable<ServiceOrder> Items, int TotalCount)> GetPagedAsync(
@@ -27,8 +28,6 @@ public class ServiceOrderRepository : Repository<ServiceOrder>, IServiceOrderRep
     {
         var query = Context.Set<ServiceOrder>()
             .AsNoTracking()
-            .Include(order => order.ServiceItems)
-            .Include(order => order.StatusHistory)
             .AsQueryable();
 
         if (filters is not null)
@@ -43,6 +42,9 @@ public class ServiceOrderRepository : Repository<ServiceOrder>, IServiceOrderRep
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query
+            .Include(order => order.ServiceItems)
+            .Include(order => order.StatusHistory)
+            .AsSplitQuery()
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
