@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Common.Messaging;
 using Domain.Interfaces.Repositories;
 using Infrastructure.Messaging;
 using Infrastructure.Persistence;
@@ -20,6 +21,10 @@ public static class DependencyInjection
         }
 
         services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
+        services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+        services.AddSingleton<IRabbitMqConnectionProvider, RabbitMqConnectionProvider>();
+        services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
+        services.AddScoped<ICommandConsumer, RabbitMqCommandConsumer>();
 
         services.AddDbContext<CarRepairOsDbContext>(options =>
             options.UseNpgsql(connectionString));

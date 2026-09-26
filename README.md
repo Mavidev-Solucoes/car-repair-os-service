@@ -9,7 +9,7 @@ Microservice extracted from `car-repair-app` for the Customer, Vehicle, ServiceO
 - FluentValidation pipeline behavior
 - AutoMapper profiles
 - PostgreSQL with EF Core mappings and DbContext
-- Domain events prepared for future RabbitMQ integration
+- RabbitMQ integration with topic exchange publisher/consumer abstractions, DLQ and retry support
 
 ## Scope kept from the original project
 
