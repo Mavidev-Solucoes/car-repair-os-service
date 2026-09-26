@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -23,21 +23,21 @@ env:
   SONAR_HOST_URL: https://sonarcloud.io
 
 jobs:
-  ci:
-    name: Restore, Build, Test, Coverage, Sonar, Docker
+  quality:
+    name: 1-4 Restore, Build, Test, Coverage
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-          cache: true
+
+      - name: Add .NET global tools to PATH
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
 
       - name: 1. Restore
         run: dotnet restore ${{ env.SOLUTION_PATH }}
@@ -53,14 +53,14 @@ jobs:
             --logger "trx;LogFileName=test-results.trx" \
             --results-directory ./TestResults \
             /p:CollectCoverage=true \
-            /p:CoverletOutput=./TestResults/Coverage/ \
+            '/p:CoverletOutput=${{ github.workspace }}/TestResults/Coverage/$(MSBuildProjectName)/' \
             /p:CoverletOutputFormat="opencover,cobertura"
 
       - name: 4. Generate Code Coverage Report
         run: |
           dotnet tool install --global dotnet-reportgenerator-globaltool
           reportgenerator \
-            -reports:"TestResults/**/coverage.cobertura.xml" \
+            -reports:"TestResults/Coverage/**/coverage.cobertura.xml" \
             -targetdir:"TestResults/CoverageReport" \
             -reporttypes:"Cobertura;TextSummary"
 
@@ -71,7 +71,7 @@ jobs:
             exit 1
           fi
 
-          python - <<'PY'
+          python3 - <<'PY'
 import os
 import xml.etree.ElementTree as ET
 
@@ -86,29 +86,100 @@ if coverage < threshold:
     raise SystemExit(f"Coverage {coverage:.2f}% is below threshold {threshold:.2f}%")
 PY
 
-      - name: 5. Validate SonarCloud secrets
-        run: |
-          [ -n "${{ secrets.SONAR_TOKEN }}" ] || (echo "Missing SONAR_TOKEN secret" && exit 1)
-          [ -n "${{ secrets.SONAR_PROJECT_KEY }}" ] || (echo "Missing SONAR_PROJECT_KEY secret" && exit 1)
-          [ -n "${{ secrets.SONAR_ORGANIZATION }}" ] || (echo "Missing SONAR_ORGANIZATION secret" && exit 1)
+  sonar:
+    name: 5. SonarQube Analysis
+    runs-on: ubuntu-latest
+    needs: quality
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+      SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
 
-      - name: 5. SonarQube Analysis (begin)
+    steps:
+      - name: Determine SonarCloud execution mode
+        id: sonar_mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event.pull_request.head.repo.fork || false }}
+        run: |
+          if [ -n "${SONAR_TOKEN}" ] && [ -n "${SONAR_PROJECT_KEY}" ] && [ -n "${SONAR_ORGANIZATION}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${EVENT_NAME}" = "pull_request" ] && [ "${IS_FORK_PR}" = "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping SonarCloud for fork pull request without secrets."
+            exit 0
+          fi
+
+          echo "Missing SONAR_TOKEN, SONAR_PROJECT_KEY, or SONAR_ORGANIZATION secret."
+          exit 1
+
+      - name: Checkout
+        if: steps.sonar_mode.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        if: steps.sonar_mode.outputs.run == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Add .NET global tools to PATH
+        if: steps.sonar_mode.outputs.run == 'true'
+        run: echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+
+      - name: Restore for Sonar analysis
+        if: steps.sonar_mode.outputs.run == 'true'
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: SonarQube Analysis (begin)
+        if: steps.sonar_mode.outputs.run == 'true'
         run: |
           dotnet tool install --global dotnet-sonarscanner
-          dotnet sonarscanner begin \
-            /k:"${{ secrets.SONAR_PROJECT_KEY }}" \
-            /o:"${{ secrets.SONAR_ORGANIZATION }}" \
-            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+          ~/.dotnet/tools/dotnet-sonarscanner begin \
+            /k:"${SONAR_PROJECT_KEY}" \
+            /o:"${SONAR_ORGANIZATION}" \
+            /d:sonar.token="${SONAR_TOKEN}" \
             /d:sonar.host.url="${{ env.SONAR_HOST_URL }}" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.cs.vstest.reportsPaths="TestResults/**/*.trx" \
             /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
 
-      - name: 5. SonarQube Analysis (build)
+      - name: Build for Sonar analysis
+        if: steps.sonar_mode.outputs.run == 'true'
         run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
 
-      - name: 5. SonarQube Analysis (end)
-        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+      - name: Test for Sonar analysis
+        if: steps.sonar_mode.outputs.run == 'true'
+        run: |
+          dotnet test ${{ env.SOLUTION_PATH }} \
+            --configuration Release \
+            --no-build \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory ./TestResults \
+            /p:CollectCoverage=true \
+            '/p:CoverletOutput=${{ github.workspace }}/TestResults/Coverage/$(MSBuildProjectName)/' \
+            /p:CoverletOutputFormat="opencover"
 
-      - name: 6. Docker Build Validation
+      - name: SonarQube Analysis (quality gate)
+        if: steps.sonar_mode.outputs.run == 'true'
+        run: ~/.dotnet/tools/dotnet-sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+
+  docker-validation:
+    name: 6. Docker Build Validation
+    runs-on: ubuntu-latest
+    needs:
+      - quality
+      - sonar
+    if: ${{ always() && needs.quality.result == 'success' && needs.sonar.result == 'success' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker build
         run: docker build --file src/Api/Dockerfile --tag car-repair-os-service:ci .

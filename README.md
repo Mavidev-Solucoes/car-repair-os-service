@@ -33,7 +33,7 @@ Microservice extracted from `car-repair-app` for the Customer, Vehicle, ServiceO
 
 ## CI / SonarCloud required GitHub Secrets
 
-Configure the following repository secrets before running `.github/workflows/ci.yml`:
+Configure the following repository secrets to enable the SonarCloud stage in `.github/workflows/ci.yml`:
 
 - `SONAR_TOKEN`: SonarCloud token with permission to analyze the project.
 - `SONAR_PROJECT_KEY`: SonarCloud project key.
