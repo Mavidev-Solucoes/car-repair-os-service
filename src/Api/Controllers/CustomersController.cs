@@ -24,10 +24,6 @@ public class CustomersController : ControllerBase
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetCustomerByIdQuery(id), cancellationToken));
 
-    [HttpGet("{id:guid}/vehicles")]
-    public async Task<IActionResult> GetWithVehicles(Guid id, CancellationToken cancellationToken)
-        => Ok(await _mediator.Send(new GetCustomerWithVehiclesQuery(id), cancellationToken));
-
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateCustomerCommand command, CancellationToken cancellationToken)
     {

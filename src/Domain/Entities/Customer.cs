@@ -6,8 +6,6 @@ namespace Domain.Entities;
 
 public class Customer : BaseEntity
 {
-    private readonly List<Vehicle> _vehicles = [];
-
     private Customer()
     {
     }
@@ -28,7 +26,6 @@ public class Customer : BaseEntity
     public string Email { get; private set; } = string.Empty;
     public string Telephone { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
-    public IReadOnlyCollection<Vehicle> Vehicles => _vehicles.AsReadOnly();
 
     public void Update(string name, string email, string telephone, bool isActive, Guid? updatedUserId = null)
     {

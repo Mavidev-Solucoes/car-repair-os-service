@@ -38,10 +38,5 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 
         builder.HasIndex(customer => customer.PersonalId).IsUnique();
         builder.HasIndex(customer => customer.Email).IsUnique();
-
-        builder.HasMany(customer => customer.Vehicles)
-            .WithOne(vehicle => vehicle.Customer)
-            .HasForeignKey(vehicle => vehicle.CustomerId)
-            .OnDelete(DeleteBehavior.Restrict);
     }
 }
