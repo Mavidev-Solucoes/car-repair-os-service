@@ -1,5 +1,6 @@
 using Domain.Common;
 using Domain.Enums;
+using Domain.Events;
 
 namespace Domain.Entities;
 
@@ -22,6 +23,7 @@ public class ServiceOrder : BaseEntity
 
         SetCreatedBy(assignedUserId);
         _statusHistory.Add(ServiceStatusHistory.CreateInitial(Id, assignedUserId));
+        RaiseDomainEvent(new ServiceOrderOpenedDomainEvent(Id));
     }
 
     public Guid VehicleId { get; private set; }
@@ -50,6 +52,11 @@ public class ServiceOrder : BaseEntity
             throw new InvalidOperationException("Service order is already cancelled.");
         }
 
+        if (Status == ServiceStatus.Closed)
+        {
+            throw new InvalidOperationException("Closed service orders cannot be cancelled.");
+        }
+
         if (requestingUserId != AssignedUserId)
         {
             throw new InvalidOperationException("Only the assigned user can cancel this service order.");
@@ -57,13 +64,36 @@ public class ServiceOrder : BaseEntity
 
         TransitionToStatus(ServiceStatus.Cancelled, requestingUserId);
         Touch(requestingUserId);
+        RaiseDomainEvent(new ServiceOrderCancelledDomainEvent(Id, requestingUserId));
+    }
+
+    public void Close(Guid requestingUserId)
+    {
+        if (Status == ServiceStatus.Closed)
+        {
+            throw new InvalidOperationException("Service order is already closed.");
+        }
+
+        if (Status == ServiceStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Cancelled service orders cannot be closed.");
+        }
+
+        if (requestingUserId != AssignedUserId)
+        {
+            throw new InvalidOperationException("Only the assigned user can close this service order.");
+        }
+
+        TransitionToStatus(ServiceStatus.Closed, requestingUserId);
+        Touch(requestingUserId);
+        RaiseDomainEvent(new ServiceOrderClosedDomainEvent(Id, requestingUserId));
     }
 
     private void EnsureCanModify(Guid requestingUserId)
     {
-        if (Status == ServiceStatus.Cancelled)
+        if (Status is ServiceStatus.Cancelled or ServiceStatus.Closed)
         {
-            throw new InvalidOperationException("Cancelled service orders cannot be modified.");
+            throw new InvalidOperationException("Cancelled or closed service orders cannot be modified.");
         }
 
         if (requestingUserId != AssignedUserId)
