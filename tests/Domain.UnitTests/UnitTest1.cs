@@ -73,6 +73,26 @@ public class ServiceOrderDomainEventsTests
         Assert.Throws<InvalidOperationException>(act);
     }
 
+    [Fact]
+    public void Cancel_WithDifferentRequestingUser_ShouldThrowInvalidOperationException()
+    {
+        var serviceOrder = CreateServiceOrder(out _);
+
+        var act = () => serviceOrder.Cancel(Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
+    [Fact]
+    public void Close_WithDifferentRequestingUser_ShouldThrowInvalidOperationException()
+    {
+        var serviceOrder = CreateServiceOrder(out _);
+
+        var act = () => serviceOrder.Close(Guid.NewGuid());
+
+        Assert.Throws<InvalidOperationException>(act);
+    }
+
     private static ServiceOrder CreateServiceOrder(out Guid assignedUserId)
     {
         assignedUserId = Guid.NewGuid();
