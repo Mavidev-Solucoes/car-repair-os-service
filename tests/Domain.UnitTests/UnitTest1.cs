@@ -45,10 +45,12 @@ public class ServiceOrderDomainEventsTests
     {
         var serviceOrder = CreateServiceOrder(out var assignedUserId);
         serviceOrder.Cancel(assignedUserId);
+        var initialEventCount = serviceOrder.DomainEvents.Count;
 
         var act = () => serviceOrder.Close(assignedUserId);
 
         Assert.Throws<InvalidOperationException>(act);
+        Assert.Equal(initialEventCount, serviceOrder.DomainEvents.Count);
     }
 
     [Fact]
@@ -56,10 +58,12 @@ public class ServiceOrderDomainEventsTests
     {
         var serviceOrder = CreateServiceOrder(out var assignedUserId);
         serviceOrder.Close(assignedUserId);
+        var initialEventCount = serviceOrder.DomainEvents.Count;
 
         var act = () => serviceOrder.Cancel(assignedUserId);
 
         Assert.Throws<InvalidOperationException>(act);
+        Assert.Equal(initialEventCount, serviceOrder.DomainEvents.Count);
     }
 
     [Fact]
@@ -67,30 +71,36 @@ public class ServiceOrderDomainEventsTests
     {
         var serviceOrder = CreateServiceOrder(out var assignedUserId);
         serviceOrder.Close(assignedUserId);
+        var initialEventCount = serviceOrder.DomainEvents.Count;
 
         var act = () => serviceOrder.Close(assignedUserId);
 
         Assert.Throws<InvalidOperationException>(act);
+        Assert.Equal(initialEventCount, serviceOrder.DomainEvents.Count);
     }
 
     [Fact]
     public void Cancel_WithDifferentRequestingUser_ShouldThrowInvalidOperationException()
     {
         var serviceOrder = CreateServiceOrder(out _);
+        var initialEventCount = serviceOrder.DomainEvents.Count;
 
         var act = () => serviceOrder.Cancel(Guid.NewGuid());
 
         Assert.Throws<InvalidOperationException>(act);
+        Assert.Equal(initialEventCount, serviceOrder.DomainEvents.Count);
     }
 
     [Fact]
     public void Close_WithDifferentRequestingUser_ShouldThrowInvalidOperationException()
     {
         var serviceOrder = CreateServiceOrder(out _);
+        var initialEventCount = serviceOrder.DomainEvents.Count;
 
         var act = () => serviceOrder.Close(Guid.NewGuid());
 
         Assert.Throws<InvalidOperationException>(act);
+        Assert.Equal(initialEventCount, serviceOrder.DomainEvents.Count);
     }
 
     private static ServiceOrder CreateServiceOrder(out Guid assignedUserId)
