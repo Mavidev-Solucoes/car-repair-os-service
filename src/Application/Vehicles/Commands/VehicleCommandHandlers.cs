@@ -68,7 +68,8 @@ public class UpdateVehicleCommandHandler : IRequestHandler<UpdateVehicleCommand,
         var vehicle = await _vehicleRepository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Vehicle), request.Id);
 
-        var plateChanged = !string.Equals(vehicle.LicensePlate, request.LicensePlate, StringComparison.OrdinalIgnoreCase);
+        var normalizedPlate = VehicleCommandHandlerHelpers.NormalizeLicensePlate(request.LicensePlate);
+        var plateChanged = !string.Equals(vehicle.LicensePlate, normalizedPlate, StringComparison.OrdinalIgnoreCase);
         if (plateChanged && await _vehicleRepository.ExistsByLicensePlateAsync(request.LicensePlate, cancellationToken))
         {
             throw new BusinessException($"A vehicle with license plate '{request.LicensePlate}' already exists.");
@@ -108,4 +109,10 @@ public class DeleteVehicleCommandHandler : IRequestHandler<DeleteVehicleCommand,
 
         return Unit.Value;
     }
+}
+
+file static class VehicleCommandHandlerHelpers
+{
+    internal static string NormalizeLicensePlate(string value) =>
+        new string(value.Where(c => c != '-').ToArray()).ToUpperInvariant();
 }
