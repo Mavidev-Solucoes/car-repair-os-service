@@ -27,6 +27,11 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
             throw new BusinessException($"A customer with personal ID '{request.PersonalId}' already exists.");
         }
 
+        if (await _customerRepository.ExistsByEmailAsync(request.Email, cancellationToken))
+        {
+            throw new BusinessException($"A customer with email '{request.Email}' already exists.");
+        }
+
         var customer = new Customer(request.Name, request.PersonalId, request.Email, request.Telephone);
         await _customerRepository.AddAsync(customer, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
@@ -52,15 +57,13 @@ public class UpdateCustomerCommandHandler : IRequestHandler<UpdateCustomerComman
         var customer = await _customerRepository.GetByIdAsync(request.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(Customer), request.Id);
 
-        customer.Update(request.Name, request.Email, request.Telephone);
-        if (request.IsActive)
+        if (!string.Equals(customer.Email, request.Email, StringComparison.OrdinalIgnoreCase) &&
+            await _customerRepository.ExistsByEmailAsync(request.Email, cancellationToken))
         {
-            customer.Activate();
+            throw new BusinessException($"A customer with email '{request.Email}' already exists.");
         }
-        else
-        {
-            customer.Deactivate();
-        }
+
+        customer.Update(request.Name, request.Email, request.Telephone, request.IsActive);
 
         _customerRepository.Update(customer);
         await _unitOfWork.CommitAsync(cancellationToken);

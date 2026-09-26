@@ -23,7 +23,10 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Unhandled exception while processing request {Path}", context.Request.Path);
+            var sanitizedPath = context.Request.Path.Value?
+                .Replace("\r", string.Empty, StringComparison.Ordinal)
+                .Replace("\n", string.Empty, StringComparison.Ordinal);
+            _logger.LogError(exception, "Unhandled exception while processing request {Path}", sanitizedPath);
             await WriteProblemDetailsAsync(context, exception);
         }
     }

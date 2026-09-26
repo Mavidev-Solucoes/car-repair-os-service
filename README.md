@@ -27,6 +27,6 @@ Microservice extracted from `car-repair-app` for the Customer, Vehicle, ServiceO
 
 ## Running locally
 
-1. Configure `ConnectionStrings:DefaultConnection` in `/home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/appsettings.json`.
+1. Configure `ConnectionStrings:DefaultConnection` via user secrets or environment variables.
 2. Run `dotnet build /home/runner/work/car-repair-os-service/car-repair-os-service/CarRepairOsService.sln`.
 3. Run the API project with `dotnet run --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.

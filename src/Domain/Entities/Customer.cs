@@ -30,23 +30,12 @@ public class Customer : BaseEntity
     public bool IsActive { get; private set; }
     public IReadOnlyCollection<Vehicle> Vehicles => _vehicles.AsReadOnly();
 
-    public void Update(string name, string email, string telephone, Guid? updatedUserId = null)
+    public void Update(string name, string email, string telephone, bool isActive, Guid? updatedUserId = null)
     {
         Name = NormalizeName(name);
         Email = NormalizeEmail(email);
         Telephone = new PhoneNumber(telephone).Value;
-        Touch(updatedUserId);
-    }
-
-    public void Activate(Guid? updatedUserId = null)
-    {
-        IsActive = true;
-        Touch(updatedUserId);
-    }
-
-    public void Deactivate(Guid? updatedUserId = null)
-    {
-        IsActive = false;
+        IsActive = isActive;
         Touch(updatedUserId);
     }
 

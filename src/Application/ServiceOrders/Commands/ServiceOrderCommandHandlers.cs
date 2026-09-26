@@ -40,7 +40,8 @@ public class OpenServiceOrderCommandHandler : IRequestHandler<OpenServiceOrderCo
         var serviceOrder = new ServiceOrder(request.VehicleId, request.CustomerId);
         await _serviceOrderRepository.AddAsync(serviceOrder, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
-        var detailed = await _serviceOrderRepository.GetWithDetailsAsync(serviceOrder.Id, cancellationToken) ?? serviceOrder;
+        var detailed = await _serviceOrderRepository.GetWithDetailsAsync(serviceOrder.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Service order was created but could not be reloaded.");
         return _mapper.Map<ServiceOrderDto>(detailed);
     }
 }

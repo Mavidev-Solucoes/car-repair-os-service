@@ -24,6 +24,12 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
         return await Context.Customers.AnyAsync(customer => customer.PersonalId == normalized, cancellationToken);
     }
 
+    public async Task<bool> ExistsByEmailAsync(string email, CancellationToken cancellationToken = default)
+    {
+        var normalized = email.Trim().ToLowerInvariant();
+        return await Context.Customers.AnyAsync(customer => customer.Email == normalized, cancellationToken);
+    }
+
     public async Task<Customer?> GetWithVehiclesAsync(Guid id, CancellationToken cancellationToken = default) =>
         await Context.Customers
             .AsNoTracking()
