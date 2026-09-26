@@ -8,6 +8,7 @@ public class CustomerProfile : Profile
 {
     public CustomerProfile()
     {
-        CreateMap<Customer, CustomerDto>();
+        CreateMap<Customer, CustomerDto>()
+            .ForCtorParam(nameof(DTOs.CustomerDto.Vehicles), options => options.MapFrom(source => source.Vehicles));
     }
 }

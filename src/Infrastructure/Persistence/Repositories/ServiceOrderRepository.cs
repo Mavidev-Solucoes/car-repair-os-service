@@ -12,10 +12,13 @@ public class ServiceOrderRepository : Repository<ServiceOrder>, IServiceOrderRep
     }
 
     public async Task<ServiceOrder?> GetWithDetailsAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await BuildDetailedQuery().FirstOrDefaultAsync(serviceOrder => serviceOrder.Id == id, cancellationToken);
+        await BuildReadDetailedQuery().FirstOrDefaultAsync(serviceOrder => serviceOrder.Id == id, cancellationToken);
+
+    public async Task<ServiceOrder?> GetTrackedWithDetailsAsync(Guid id, CancellationToken cancellationToken = default) =>
+        await BuildTrackedDetailedQuery().FirstOrDefaultAsync(serviceOrder => serviceOrder.Id == id, cancellationToken);
 
     public async Task<IEnumerable<ServiceOrder>> GetAllWithDetailsAsync(CancellationToken cancellationToken = default) =>
-        await BuildDetailedQuery().AsNoTracking().ToListAsync(cancellationToken);
+        await BuildReadDetailedQuery().ToListAsync(cancellationToken);
 
     public async Task<IEnumerable<ServiceStatusHistory>> GetStatusHistoryAsync(Guid serviceOrderId, CancellationToken cancellationToken = default) =>
         await Context.ServiceStatusHistories
@@ -26,7 +29,7 @@ public class ServiceOrderRepository : Repository<ServiceOrder>, IServiceOrderRep
 
     public async Task<(IEnumerable<ServiceOrder> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? orderBy, bool orderDescending, IEnumerable<Expression<Func<ServiceOrder, bool>>>? filters = null, CancellationToken cancellationToken = default)
     {
-        var query = BuildDetailedQuery().AsNoTracking();
+        var query = BuildReadDetailedQuery();
 
         if (filters is not null)
         {
@@ -47,13 +50,15 @@ public class ServiceOrderRepository : Repository<ServiceOrder>, IServiceOrderRep
         return (items, totalCount);
     }
 
-    private IQueryable<ServiceOrder> BuildDetailedQuery() =>
+    private IQueryable<ServiceOrder> BuildTrackedDetailedQuery() =>
         Context.ServiceOrders
             .Include(serviceOrder => serviceOrder.Items)
             .Include(serviceOrder => serviceOrder.StatusHistory)
             .Include(serviceOrder => serviceOrder.Customer)
             .Include(serviceOrder => serviceOrder.Vehicle)
             .AsSplitQuery();
+
+    private IQueryable<ServiceOrder> BuildReadDetailedQuery() => BuildTrackedDetailedQuery().AsNoTracking();
 
     private static IQueryable<ServiceOrder> ApplyOrdering(IQueryable<ServiceOrder> query, string? orderBy, bool orderDescending)
         => (orderBy?.Trim().ToLowerInvariant()) switch

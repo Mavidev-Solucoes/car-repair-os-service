@@ -6,6 +6,7 @@ namespace Domain.Interfaces.Repositories;
 public interface IServiceOrderRepository : IRepository<ServiceOrder>
 {
     Task<ServiceOrder?> GetWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ServiceOrder?> GetTrackedWithDetailsAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IEnumerable<ServiceOrder>> GetAllWithDetailsAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<ServiceStatusHistory>> GetStatusHistoryAsync(Guid serviceOrderId, CancellationToken cancellationToken = default);
     Task<(IEnumerable<ServiceOrder> Items, int TotalCount)> GetPagedAsync(

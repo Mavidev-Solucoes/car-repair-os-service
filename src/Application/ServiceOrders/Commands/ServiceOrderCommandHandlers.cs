@@ -66,7 +66,7 @@ public class AddServiceOrderItemCommandHandler : IRequestHandler<AddServiceOrder
 
     public async Task<ServiceOrderDto> Handle(AddServiceOrderItemCommand request, CancellationToken cancellationToken)
     {
-        var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
+        var serviceOrder = await _serviceOrderRepository.GetTrackedWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
         serviceOrder.AddItem(request.Description, request.UnitPrice, request.Quantity, _currentUserService.UserId);
@@ -93,7 +93,7 @@ public class UpdateServiceOrderItemCommandHandler : IRequestHandler<UpdateServic
 
     public async Task<ServiceOrderDto> Handle(UpdateServiceOrderItemCommand request, CancellationToken cancellationToken)
     {
-        var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
+        var serviceOrder = await _serviceOrderRepository.GetTrackedWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
         serviceOrder.UpdateItem(request.ServiceOrderItemId, request.Description, request.UnitPrice, request.Quantity, _currentUserService.UserId);
@@ -120,7 +120,7 @@ public class RemoveServiceOrderItemCommandHandler : IRequestHandler<RemoveServic
 
     public async Task<ServiceOrderDto> Handle(RemoveServiceOrderItemCommand request, CancellationToken cancellationToken)
     {
-        var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
+        var serviceOrder = await _serviceOrderRepository.GetTrackedWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
         serviceOrder.RemoveItem(request.ServiceOrderItemId, _currentUserService.UserId);
@@ -147,7 +147,7 @@ public class UpdateServiceOrderStatusCommandHandler : IRequestHandler<UpdateServ
 
     public async Task<ServiceOrderDto> Handle(UpdateServiceOrderStatusCommand request, CancellationToken cancellationToken)
     {
-        var serviceOrder = await _serviceOrderRepository.GetWithDetailsAsync(request.ServiceOrderId, cancellationToken)
+        var serviceOrder = await _serviceOrderRepository.GetTrackedWithDetailsAsync(request.ServiceOrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ServiceOrder), request.ServiceOrderId);
 
         serviceOrder.UpdateStatus(request.Status, _currentUserService.UserId);
