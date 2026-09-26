@@ -4,6 +4,8 @@ using Application.Common.Messaging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Infrastructure.Messaging;
 
@@ -33,11 +35,13 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         var processingToken = linkedCancellationTokenSource.Token;
         var channel = _connectionProvider.CreateChannel();
         var channelLock = new object();
+        var inFlightHandlers = 0;
         DeclareTopology(channel, queueName, routingKey);
 
         var consumer = new AsyncEventingBasicConsumer(channel);
         consumer.Received += async (_, eventArgs) =>
         {
+            Interlocked.Increment(ref inFlightHandlers);
             var body = eventArgs.Body.ToArray();
 
             try
@@ -78,10 +82,19 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                     }
                 }
             }
+            finally
+            {
+                Interlocked.Decrement(ref inFlightHandlers);
+            }
         };
 
         var consumerTag = channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
-        IAsyncDisposable subscription = new RabbitMqConsumerSubscription(channel, channelLock, consumerTag, linkedCancellationTokenSource);
+        IAsyncDisposable subscription = new RabbitMqConsumerSubscription(
+            channel,
+            channelLock,
+            consumerTag,
+            linkedCancellationTokenSource,
+            () => Interlocked.CompareExchange(ref inFlightHandlers, 0, 0));
         return Task.FromResult(subscription);
     }
 
@@ -96,7 +109,16 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         channel.ExchangeDeclare(retryExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
         channel.ExchangeDeclare(deadLetterExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
 
-        channel.QueueDeclare(queue: queueName, durable: true, exclusive: false, autoDelete: false);
+        channel.QueueDeclare(
+            queue: queueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: new Dictionary<string, object>
+            {
+                ["x-dead-letter-exchange"] = deadLetterExchangeName,
+                ["x-dead-letter-routing-key"] = routingKey
+            });
         channel.QueueBind(queue: queueName, exchange: _options.ExchangeName, routingKey: routingKey);
 
         channel.QueueDeclare(
@@ -225,18 +247,21 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         private readonly object _channelLock;
         private readonly string _consumerTag;
         private readonly CancellationTokenSource _cancellationTokenSource;
+        private readonly Func<int> _inFlightHandlersGetter;
         private bool _disposed;
 
         public RabbitMqConsumerSubscription(
             IModel channel,
             object channelLock,
             string consumerTag,
-            CancellationTokenSource cancellationTokenSource)
+            CancellationTokenSource cancellationTokenSource,
+            Func<int> inFlightHandlersGetter)
         {
             _channel = channel;
             _channelLock = channelLock;
             _consumerTag = consumerTag;
             _cancellationTokenSource = cancellationTokenSource;
+            _inFlightHandlersGetter = inFlightHandlersGetter;
         }
 
         public ValueTask DisposeAsync()
@@ -255,6 +280,13 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                 {
                     _channel.BasicCancel(_consumerTag);
                 }
+            }
+
+            var waitTimeout = TimeSpan.FromSeconds(5);
+            var stopwatch = Stopwatch.StartNew();
+            while (_inFlightHandlersGetter() > 0 && stopwatch.Elapsed < waitTimeout)
+            {
+                Thread.Sleep(50);
             }
 
             _channel.Dispose();

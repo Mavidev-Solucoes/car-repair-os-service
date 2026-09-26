@@ -9,14 +9,15 @@ namespace Infrastructure.Messaging;
 public class RabbitMqEventPublisher : IEventPublisher
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
+    private readonly object _topologyLock = new();
     private readonly IRabbitMqConnectionProvider _connectionProvider;
     private readonly RabbitMqOptions _options;
+    private bool _topologyEnsured;
 
     public RabbitMqEventPublisher(IRabbitMqConnectionProvider connectionProvider, IOptions<RabbitMqOptions> options)
     {
         _connectionProvider = connectionProvider;
         _options = options.Value;
-        EnsureTopology();
     }
 
     public Task PublishAsync<TEvent>(
@@ -28,6 +29,7 @@ public class RabbitMqEventPublisher : IEventPublisher
         cancellationToken.ThrowIfCancellationRequested();
 
         using var channel = _connectionProvider.CreateChannel();
+        EnsureTopology(channel);
 
         var payload = JsonSerializer.Serialize(message, SerializerOptions);
         var body = Encoding.UTF8.GetBytes(payload);
@@ -48,9 +50,22 @@ public class RabbitMqEventPublisher : IEventPublisher
         return Task.CompletedTask;
     }
 
-    private void EnsureTopology()
+    private void EnsureTopology(IModel channel)
     {
-        using var channel = _connectionProvider.CreateChannel();
-        channel.ExchangeDeclare(_options.ExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
+        if (_topologyEnsured)
+        {
+            return;
+        }
+
+        lock (_topologyLock)
+        {
+            if (_topologyEnsured)
+            {
+                return;
+            }
+
+            channel.ExchangeDeclare(_options.ExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
+            _topologyEnsured = true;
+        }
     }
 }
