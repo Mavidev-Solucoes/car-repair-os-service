@@ -1,0 +1,21 @@
+using Application.Common;
+using Application.DTOs;
+using MediatR;
+
+namespace Application.Vehicles.Queries;
+
+public record GetVehicleByIdQuery(Guid Id) : IRequest<VehicleDto>;
+
+public record GetVehiclesByCustomerIdQuery(Guid CustomerId) : IRequest<IEnumerable<VehicleDto>>;
+
+public record GetVehiclesQuery : IRequest<PagedResult<VehicleDto>>
+{
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 10;
+    public string? OrderBy { get; init; }
+    public bool OrderDescending { get; init; }
+    public string? Brand { get; init; }
+    public string? Model { get; init; }
+    public int? Year { get; init; }
+    public string? LicensePlate { get; init; }
+}
