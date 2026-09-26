@@ -1,2 +1,32 @@
 # car-repair-os-service
-Esse projeto faz parte do Tech Challenge do curso de Arquitetura de Soluções da FIAP
+
+Microservice extracted from `car-repair-app` for the Customer, Vehicle, ServiceOrder, ServiceOrderItem and ServiceStatusHistory domains.
+
+## Architecture
+
+- Clean Architecture with `Api`, `Application`, `Domain` and `Infrastructure`
+- CQRS with MediatR handlers
+- FluentValidation pipeline behavior
+- AutoMapper profiles
+- PostgreSQL with EF Core mappings and DbContext
+- Domain events prepared for future RabbitMQ integration
+
+## Scope kept from the original project
+
+- Customer management
+- Vehicle management
+- Service order intake and lifecycle
+- Service order items
+- Service status history
+
+## Scope intentionally removed
+
+- Payment logic
+- Budget / approval logic
+- Service execution / job logic
+
+## Running locally
+
+1. Configure `ConnectionStrings:DefaultConnection` via user secrets or environment variables.
+2. Run `dotnet build /home/runner/work/car-repair-os-service/car-repair-os-service/CarRepairOsService.sln`.
+3. Run the API project with `dotnet run --project /home/runner/work/car-repair-os-service/car-repair-os-service/src/Api/Api.csproj`.

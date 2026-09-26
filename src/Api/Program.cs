@@ -1,5 +1,8 @@
 using Application.DependencyInjection;
+using Application.Common.Interfaces;
 using Infrastructure.DependencyInjection;
+using Api.Middleware;
+using Api;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,13 +10,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHealthChecks();
-builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services
     .AddApplication()
-    .AddInfrastructure();
+    .AddInfrastructure(builder.Configuration);
+
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -21,9 +28,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseRouting();
-app.UseAuthorization();
-
+app.UseHttpsRedirection();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
