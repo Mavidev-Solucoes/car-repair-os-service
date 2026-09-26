@@ -51,7 +51,7 @@ public class ExceptionHandlingMiddleware
         {
             Status = statusCode,
             Title = title,
-            Detail = exception.Message,
+            Detail = statusCode >= StatusCodes.Status500InternalServerError ? "An unexpected error occurred." : exception.Message,
             Instance = context.Request.Path
         };
 
