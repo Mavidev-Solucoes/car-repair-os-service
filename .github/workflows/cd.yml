@@ -43,8 +43,11 @@ jobs:
 
       - name: Compute image name
         id: image
-        shell: bash
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const imageName = `ghcr.io/${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+            core.setOutput('name', imageName);
 
       - name: Build and push
         uses: docker/build-push-action@v6
