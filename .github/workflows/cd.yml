@@ -49,12 +49,20 @@ jobs:
             const imageName = `ghcr.io/${context.repo.owner}/${context.repo.repo}`.toLowerCase();
             core.setOutput('name', imageName);
 
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ github.event.workflow_run.head_sha }}
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           file: src/Api/Dockerfile
           push: true
-          tags: |
-            ${{ steps.image.outputs.name }}:latest
-            ${{ steps.image.outputs.name }}:${{ github.event.workflow_run.head_sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
