@@ -38,3 +38,10 @@ Configure the following repository secrets to enable the SonarCloud stage in `.g
 - `SONAR_TOKEN`: SonarCloud token with permission to analyze the project.
 - `SONAR_PROJECT_KEY`: SonarCloud project key.
 - `SONAR_ORGANIZATION`: SonarCloud organization key.
+
+## CD / GHCR secrets and permissions
+
+The CD workflow in `.github/workflows/cd.yml` publishes Docker images to GHCR using the default `GITHUB_TOKEN`.
+
+- No additional repository secret is required for GHCR publish in the same repository.
+- Ensure workflow permissions allow `packages: write` (already configured in `cd.yml`).
