@@ -30,18 +30,6 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
         return await Context.Customers.AnyAsync(customer => customer.Email == normalized, cancellationToken);
     }
 
-    public async Task<Customer?> GetWithVehiclesAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await Context.Customers
-            .AsNoTracking()
-            .Include(customer => customer.Vehicles)
-            .FirstOrDefaultAsync(customer => customer.Id == id, cancellationToken);
-
-    public async Task<bool> HasVehiclesAsync(Guid customerId, CancellationToken cancellationToken = default) =>
-        await Context.Vehicles.AnyAsync(vehicle => vehicle.CustomerId == customerId, cancellationToken);
-
-    public async Task<bool> HasServiceOrdersAsync(Guid customerId, CancellationToken cancellationToken = default) =>
-        await Context.ServiceOrders.AnyAsync(serviceOrder => serviceOrder.CustomerId == customerId, cancellationToken);
-
     public async Task<(IEnumerable<Customer> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? orderBy, bool orderDescending, IEnumerable<Expression<Func<Customer, bool>>>? filters = null, CancellationToken cancellationToken = default)
     {
         var query = Context.Customers.AsNoTracking().AsQueryable();

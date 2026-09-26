@@ -29,26 +29,6 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
     }
 }
 
-public class GetCustomerWithVehiclesQueryHandler : IRequestHandler<GetCustomerWithVehiclesQuery, CustomerDto>
-{
-    private readonly ICustomerRepository _customerRepository;
-    private readonly IMapper _mapper;
-
-    public GetCustomerWithVehiclesQueryHandler(ICustomerRepository customerRepository, IMapper mapper)
-    {
-        _customerRepository = customerRepository;
-        _mapper = mapper;
-    }
-
-    public async Task<CustomerDto> Handle(GetCustomerWithVehiclesQuery request, CancellationToken cancellationToken)
-    {
-        var customer = await _customerRepository.GetWithVehiclesAsync(request.Id, cancellationToken)
-            ?? throw new NotFoundException(nameof(Customer), request.Id);
-
-        return _mapper.Map<CustomerDto>(customer);
-    }
-}
-
 public class GetCustomersQueryHandler : IRequestHandler<GetCustomersQuery, PagedResult<CustomerDto>>
 {
     private readonly ICustomerRepository _customerRepository;

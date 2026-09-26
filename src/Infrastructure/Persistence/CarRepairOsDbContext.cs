@@ -18,19 +18,11 @@ public class CarRepairOsDbContext : DbContext, IUnitOfWork
     }
 
     public DbSet<Customer> Customers => Set<Customer>();
-    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
-    public DbSet<ServiceOrder> ServiceOrders => Set<ServiceOrder>();
-    public DbSet<ServiceOrderItem> ServiceOrderItems => Set<ServiceOrderItem>();
-    public DbSet<ServiceStatusHistory> ServiceStatusHistories => Set<ServiceStatusHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfiguration(new CustomerConfiguration());
-        modelBuilder.ApplyConfiguration(new VehicleConfiguration());
-        modelBuilder.ApplyConfiguration(new ServiceOrderConfiguration());
-        modelBuilder.ApplyConfiguration(new ServiceOrderItemConfiguration());
-        modelBuilder.ApplyConfiguration(new ServiceStatusHistoryConfiguration());
     }
 
     public async Task<int> CommitAsync(CancellationToken cancellationToken = default)
