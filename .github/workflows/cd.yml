@@ -13,8 +13,8 @@ permissions:
   packages: write
 
 concurrency:
-  group: cd-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.head_sha }}
-  cancel-in-progress: true
+  group: cd-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
 
 jobs:
   docker-publish:
