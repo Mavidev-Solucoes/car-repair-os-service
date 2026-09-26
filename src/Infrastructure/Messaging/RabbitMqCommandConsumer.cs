@@ -28,6 +28,7 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         where TCommand : class
     {
         using var channel = _connectionProvider.CreateChannel();
+        var channelLock = new object();
         DeclareTopology(channel, queueName, routingKey);
 
         var consumer = new AsyncEventingBasicConsumer(channel);
@@ -42,34 +43,42 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                     ?? throw new InvalidOperationException("Invalid RabbitMQ message payload.");
 
                 await handler(message, cancellationToken);
-                channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                lock (channelLock)
+                {
+                    channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                }
             }
             catch
             {
                 var retryCount = GetRetryCount(eventArgs.BasicProperties.Headers);
-                if (retryCount < _options.MaxRetries)
-                {
-                    PublishToRetryExchange(channel, body, eventArgs.BasicProperties, routingKey, retryCount + 1);
-                }
-                else
-                {
-                    PublishToDeadLetterExchange(channel, body, eventArgs.BasicProperties, routingKey);
-                }
+                var republished = retryCount < _options.MaxRetries
+                    ? TryPublishToRetryExchange(channel, channelLock, body, eventArgs.BasicProperties, routingKey, retryCount + 1)
+                    : TryPublishToDeadLetterExchange(channel, channelLock, body, eventArgs.BasicProperties, routingKey);
 
-                channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                lock (channelLock)
+                {
+                    if (republished)
+                    {
+                        channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
+                    }
+                    else
+                    {
+                        channel.BasicNack(eventArgs.DeliveryTag, multiple: false, requeue: true);
+                    }
+                }
             }
         };
 
         var consumerTag = channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        using var registration = cancellationToken.Register(() =>
-        {
-            channel.BasicCancel(consumerTag);
-            completion.TrySetResult();
-        });
+        using var registration = cancellationToken.Register(() => completion.TrySetResult());
 
         await completion.Task;
+        lock (channelLock)
+        {
+            channel.BasicCancel(consumerTag);
+        }
     }
 
     private void DeclareTopology(IModel channel, string queueName, string routingKey)
@@ -103,50 +112,76 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         channel.QueueBind(queue: deadLetterQueueName, exchange: deadLetterExchangeName, routingKey: routingKey);
     }
 
-    private void PublishToRetryExchange(
+    private bool TryPublishToRetryExchange(
         IModel channel,
+        object channelLock,
         byte[] body,
         IBasicProperties properties,
         string routingKey,
         int retryCount)
     {
-        var retryProperties = channel.CreateBasicProperties();
-        retryProperties.ContentType = properties.ContentType;
-        retryProperties.DeliveryMode = 2;
-        retryProperties.MessageId = properties.MessageId;
-        retryProperties.CorrelationId = properties.CorrelationId;
-        retryProperties.Type = properties.Type;
-        retryProperties.Timestamp = properties.Timestamp;
-        retryProperties.Headers = CloneHeaders(properties.Headers);
-        retryProperties.Headers[RetryCountHeader] = retryCount;
+        try
+        {
+            lock (channelLock)
+            {
+                var retryProperties = channel.CreateBasicProperties();
+                retryProperties.ContentType = properties.ContentType;
+                retryProperties.DeliveryMode = 2;
+                retryProperties.MessageId = properties.MessageId;
+                retryProperties.CorrelationId = properties.CorrelationId;
+                retryProperties.Type = properties.Type;
+                retryProperties.Timestamp = properties.Timestamp;
+                retryProperties.Headers = CloneHeaders(properties.Headers);
+                retryProperties.Headers[RetryCountHeader] = retryCount;
 
-        channel.BasicPublish(
-            exchange: GetRetryExchangeName(),
-            routingKey: routingKey,
-            basicProperties: retryProperties,
-            body: body);
+                channel.BasicPublish(
+                    exchange: GetRetryExchangeName(),
+                    routingKey: routingKey,
+                    basicProperties: retryProperties,
+                    body: body);
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
-    private void PublishToDeadLetterExchange(
+    private bool TryPublishToDeadLetterExchange(
         IModel channel,
+        object channelLock,
         byte[] body,
         IBasicProperties properties,
         string routingKey)
     {
-        var deadLetterProperties = channel.CreateBasicProperties();
-        deadLetterProperties.ContentType = properties.ContentType;
-        deadLetterProperties.DeliveryMode = 2;
-        deadLetterProperties.MessageId = properties.MessageId;
-        deadLetterProperties.CorrelationId = properties.CorrelationId;
-        deadLetterProperties.Type = properties.Type;
-        deadLetterProperties.Timestamp = properties.Timestamp;
-        deadLetterProperties.Headers = CloneHeaders(properties.Headers);
+        try
+        {
+            lock (channelLock)
+            {
+                var deadLetterProperties = channel.CreateBasicProperties();
+                deadLetterProperties.ContentType = properties.ContentType;
+                deadLetterProperties.DeliveryMode = 2;
+                deadLetterProperties.MessageId = properties.MessageId;
+                deadLetterProperties.CorrelationId = properties.CorrelationId;
+                deadLetterProperties.Type = properties.Type;
+                deadLetterProperties.Timestamp = properties.Timestamp;
+                deadLetterProperties.Headers = CloneHeaders(properties.Headers);
 
-        channel.BasicPublish(
-            exchange: GetDeadLetterExchangeName(),
-            routingKey: routingKey,
-            basicProperties: deadLetterProperties,
-            body: body);
+                channel.BasicPublish(
+                    exchange: GetDeadLetterExchangeName(),
+                    routingKey: routingKey,
+                    basicProperties: deadLetterProperties,
+                    body: body);
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static Dictionary<string, object> CloneHeaders(IDictionary<string, object>? headers)

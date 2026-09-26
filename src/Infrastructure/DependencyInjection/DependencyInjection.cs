@@ -23,8 +23,8 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventDispatcher, MediatRDomainEventDispatcher>();
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.AddSingleton<IRabbitMqConnectionProvider, RabbitMqConnectionProvider>();
-        services.AddScoped<IEventPublisher, RabbitMqEventPublisher>();
-        services.AddScoped<ICommandConsumer, RabbitMqCommandConsumer>();
+        services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
+        services.AddSingleton<ICommandConsumer, RabbitMqCommandConsumer>();
 
         services.AddDbContext<CarRepairOsDbContext>(options =>
             options.UseNpgsql(connectionString));
