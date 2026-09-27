@@ -30,10 +30,10 @@ public class ServiceOrdersController : ControllerBase
         }
 
         var result = await _mediator.Send(command, cancellationToken);
-        return CreatedAtRoute("GetServiceOrderById", new { id = result.Id }, result);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
-    [HttpGet("{id:guid}", Name = "GetServiceOrderById")]
+    [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetServiceOrderByIdQuery(id), cancellationToken));
 
