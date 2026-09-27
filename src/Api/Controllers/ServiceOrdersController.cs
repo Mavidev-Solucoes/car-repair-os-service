@@ -30,7 +30,7 @@ public class ServiceOrdersController : ControllerBase
         }
 
         var result = await _mediator.Send(command, cancellationToken);
-        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+        return Created($"/api/service-orders/{result.Id}", result);
     }
 
     [HttpGet("{id:guid}")]
