@@ -1,5 +1,6 @@
 using Application.Common;
 using Application.DTOs;
+using FluentValidation;
 using MediatR;
 
 namespace Application.Vehicles.Queries;
@@ -19,3 +20,15 @@ public record GetVehiclesQuery : IRequest<PagedResult<VehicleDto>>
 }
 
 public record GetVehiclesByCustomerIdQuery(Guid CustomerId) : IRequest<IEnumerable<VehicleDto>>;
+
+public class GetVehiclesQueryValidator : AbstractValidator<GetVehiclesQuery>
+{
+    public GetVehiclesQueryValidator()
+    {
+        RuleFor(query => query.Page)
+            .GreaterThan(0).WithMessage("Page must be greater than zero.");
+
+        RuleFor(query => query.PageSize)
+            .InclusiveBetween(1, 200).WithMessage("PageSize must be between 1 and 200.");
+    }
+}

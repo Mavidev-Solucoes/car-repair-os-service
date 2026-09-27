@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Api.Controllers;
 
 [ApiController]
+[Route("api/service-orders")]
 [Route("service-orders")]
 public class ServiceOrdersController : ControllerBase
 {
@@ -29,10 +30,10 @@ public class ServiceOrdersController : ControllerBase
         }
 
         var result = await _mediator.Send(command, cancellationToken);
-        return CreatedAtRoute("GetServiceOrderById", new { id = result.Id }, result);
+        return Created($"/api/service-orders/{result.Id}", result);
     }
 
-    [HttpGet("{id:guid}", Name = "GetServiceOrderById")]
+    [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
         => Ok(await _mediator.Send(new GetServiceOrderByIdQuery(id), cancellationToken));
 

@@ -1,5 +1,6 @@
 using Application.Common;
 using Application.DTOs;
+using FluentValidation;
 using MediatR;
 
 namespace Application.Customers.Queries;
@@ -16,4 +17,16 @@ public record GetCustomersQuery : IRequest<PagedResult<CustomerDto>>
     public string? Email { get; init; }
     public string? PersonalId { get; init; }
     public string? Telephone { get; init; }
+}
+
+public class GetCustomersQueryValidator : AbstractValidator<GetCustomersQuery>
+{
+    public GetCustomersQueryValidator()
+    {
+        RuleFor(query => query.Page)
+            .GreaterThan(0).WithMessage("Page must be greater than zero.");
+
+        RuleFor(query => query.PageSize)
+            .InclusiveBetween(1, 200).WithMessage("PageSize must be between 1 and 200.");
+    }
 }
