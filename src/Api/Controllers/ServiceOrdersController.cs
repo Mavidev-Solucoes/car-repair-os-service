@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Api.Controllers;
 
 [ApiController]
+[Route("api/service-orders")]
 [Route("service-orders")]
 public class ServiceOrdersController : ControllerBase
 {

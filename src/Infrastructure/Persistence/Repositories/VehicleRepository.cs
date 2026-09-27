@@ -1,4 +1,3 @@
-using System.Data;
 using System.Linq.Expressions;
 using Domain.Entities;
 using Domain.Interfaces.Repositories;
@@ -28,7 +27,7 @@ public class VehicleRepository : Repository<Vehicle>, IVehicleRepository
     }
 
     public Task<bool> HasServiceOrdersAsync(Guid vehicleId, CancellationToken cancellationToken = default) =>
-        LegacyTableHasVehicleAsync("public.service_orders", "SELECT EXISTS (SELECT 1 FROM public.service_orders WHERE vehicle_id = @vehicleId)", vehicleId, cancellationToken);
+        Context.ServiceOrders.AnyAsync(serviceOrder => serviceOrder.VehicleId == vehicleId, cancellationToken);
 
     public async Task<(IEnumerable<Vehicle> Items, int TotalCount)> GetPagedAsync(int page, int pageSize, string? orderBy, bool orderDescending, IEnumerable<Expression<Func<Vehicle, bool>>>? filters = null, CancellationToken cancellationToken = default)
     {
@@ -63,55 +62,6 @@ public class VehicleRepository : Repository<Vehicle>, IVehicleRepository
             "createdat" => orderDescending ? query.OrderByDescending(vehicle => vehicle.CreatedAt) : query.OrderBy(vehicle => vehicle.CreatedAt),
             _ => query.OrderBy(vehicle => vehicle.Brand)
         };
-
-    private async Task<bool> LegacyTableHasVehicleAsync(string tableName, string existsSql, Guid vehicleId, CancellationToken cancellationToken)
-    {
-        if (!Context.Database.IsNpgsql())
-        {
-            return false;
-        }
-
-        var connection = Context.Database.GetDbConnection();
-        var shouldCloseConnection = connection.State != ConnectionState.Open;
-
-        if (shouldCloseConnection)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            await using var tableCommand = connection.CreateCommand();
-            tableCommand.CommandText = "SELECT to_regclass(@tableName)";
-            var tableParameter = tableCommand.CreateParameter();
-            tableParameter.ParameterName = "tableName";
-            tableParameter.Value = tableName;
-            tableCommand.Parameters.Add(tableParameter);
-
-            var tableExists = await tableCommand.ExecuteScalarAsync(cancellationToken);
-            if (tableExists is null or DBNull)
-            {
-                return false;
-            }
-
-            await using var relationCommand = connection.CreateCommand();
-            relationCommand.CommandText = existsSql;
-            var customerParameter = relationCommand.CreateParameter();
-            customerParameter.ParameterName = "vehicleId";
-            customerParameter.Value = vehicleId;
-            relationCommand.Parameters.Add(customerParameter);
-
-            var result = await relationCommand.ExecuteScalarAsync(cancellationToken);
-            return result is not null and not DBNull && Convert.ToBoolean(result);
-        }
-        finally
-        {
-            if (shouldCloseConnection && Context.Database.CurrentTransaction is null)
-            {
-                await connection.CloseAsync();
-            }
-        }
-    }
 
     private static string NormalizeLicensePlate(string value) =>
         new string(value.Where(c => c != '-').ToArray()).ToUpperInvariant();
