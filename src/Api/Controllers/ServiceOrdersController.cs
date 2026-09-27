@@ -8,7 +8,6 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/service-orders")]
-[Route("service-orders")]
 public class ServiceOrdersController : ControllerBase
 {
     private readonly IMediator _mediator;

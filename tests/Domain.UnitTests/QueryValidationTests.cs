@@ -54,4 +54,26 @@ public class QueryValidationTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void GetServiceOrdersQuery_WithLowercaseStatus_ShouldPassValidation()
+    {
+        var validator = new GetServiceOrdersQueryValidator();
+        var query = new GetServiceOrdersQuery { Page = 1, PageSize = 20, Status = "diagnosing" };
+
+        var result = validator.Validate(query);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void GetServiceOrdersQuery_WithWhitespaceStatus_ShouldPassValidation()
+    {
+        var validator = new GetServiceOrdersQueryValidator();
+        var query = new GetServiceOrdersQuery { Page = 1, PageSize = 20, Status = "   " };
+
+        var result = validator.Validate(query);
+
+        Assert.True(result.IsValid);
+    }
 }
