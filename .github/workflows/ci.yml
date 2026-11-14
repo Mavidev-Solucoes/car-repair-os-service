@@ -72,19 +72,19 @@ jobs:
           fi
 
           python3 - <<'PY'
-import os
-import xml.etree.ElementTree as ET
+          import os
+          import xml.etree.ElementTree as ET
 
-threshold = float(os.environ["COVERAGE_THRESHOLD"])
-report_path = "TestResults/CoverageReport/Cobertura.xml"
+          threshold = float(os.environ["COVERAGE_THRESHOLD"])
+          report_path = "TestResults/CoverageReport/Cobertura.xml"
 
-line_rate = float(ET.parse(report_path).getroot().attrib.get("line-rate", 0.0))
-coverage = line_rate * 100
+          line_rate = float(ET.parse(report_path).getroot().attrib.get("line-rate", 0.0))
+          coverage = line_rate * 100
 
-print(f"Computed line coverage: {coverage:.2f}%")
-if coverage < threshold:
-    raise SystemExit(f"Coverage {coverage:.2f}% is below threshold {threshold:.2f}%")
-PY
+          print(f"Computed line coverage: {coverage:.2f}%")
+          if coverage < threshold:
+              raise SystemExit(f"Coverage {coverage:.2f}% is below threshold {threshold:.2f}%")
+          PY
 
   sonar:
     name: 5. SonarQube Analysis
