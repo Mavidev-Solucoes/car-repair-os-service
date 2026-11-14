@@ -147,7 +147,8 @@ jobs:
             /d:sonar.qualitygate.wait=true \
             /d:sonar.cs.vstest.reportsPaths="TestResults/**/*.trx" \
             /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml" \
-            /d:sonar.coverage.exclusions="**/Migrations/**"
+            /d:sonar.coverage.exclusions="**/Migrations/**" \
+            /d:sonar.exclusions="**/TestResults/**,**/CoverageReport/**,**/bin/**,**/obj/**"
 
       - name: Build for Sonar analysis
         if: steps.sonar_mode.outputs.run == 'true'

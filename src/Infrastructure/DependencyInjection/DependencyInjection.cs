@@ -59,6 +59,11 @@ public static class DependencyInjection
         services.AddSingleton<ICommandConsumer, RabbitMqCommandConsumer>();
         services.AddHostedService<SagaCommandsWorker>();
 
+        if (configuration.GetValue("Database:MigrateOnStartup", true))
+        {
+            services.AddHostedService<DatabaseMigrationHostedService>();
+        }
+
         services.AddDbContext<CarRepairOsDbContext>(options =>
             options.UseNpgsql(
                 connectionString,

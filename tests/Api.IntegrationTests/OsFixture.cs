@@ -48,8 +48,13 @@ public sealed class OsFixture : IAsyncLifetime
             builder.UseSetting("RabbitMq:RetryDelayMilliseconds", "200");
         });
 
-        using var scope = Factory.Services.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<CarRepairOsDbContext>().Database.MigrateAsync();
+        // As migrations são aplicadas pelo próprio serviço na subida (DatabaseMigrationHostedService).
+        await WaitForAsync(async () =>
+        {
+            using var scope = Factory.Services.CreateScope();
+            var pending = await scope.ServiceProvider.GetRequiredService<CarRepairOsDbContext>().Database.GetPendingMigrationsAsync();
+            return pending.Any() ? null : "ok";
+        }, TimeSpan.FromSeconds(60));
     }
 
     public async Task DisposeAsync()
