@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 using System.Diagnostics;
 using System.Threading;
 
@@ -308,9 +309,16 @@ public class RabbitMqCommandConsumer : ICommandConsumer
 
             lock (_channelLock)
             {
-                if (_channel.IsOpen)
+                try
                 {
-                    _channel.BasicCancel(_consumerTag);
+                    if (_channel.IsOpen)
+                    {
+                        _channel.BasicCancel(_consumerTag);
+                    }
+                }
+                catch (Exception exception) when (exception is OperationInterruptedException or AlreadyClosedException)
+                {
+                    // O canal ou a conexão fecharam enquanto o serviço desligava: não há mais consumer a cancelar.
                 }
             }
 

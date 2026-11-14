@@ -62,8 +62,9 @@ public sealed class SagaCommandsWorker(
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        await DisposeSubscriptionsAsync();
+        // Primeiro encerra o ExecuteAsync (que ainda pode estar assinando filas); depois descarta as assinaturas.
         await base.StopAsync(cancellationToken);
+        await DisposeSubscriptionsAsync();
     }
 
     public async Task SendAsync(IBaseRequest request, CancellationToken cancellationToken)
@@ -75,11 +76,11 @@ public sealed class SagaCommandsWorker(
 
     private async Task DisposeSubscriptionsAsync()
     {
-        foreach (var subscription in _subscriptions)
+        var subscriptions = _subscriptions.ToArray();
+        _subscriptions.Clear();
+        foreach (var subscription in subscriptions)
         {
             await subscription.DisposeAsync();
         }
-
-        _subscriptions.Clear();
     }
 }
