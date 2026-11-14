@@ -313,7 +313,9 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                 {
                     if (_channel.IsOpen)
                     {
-                        _channel.BasicCancel(_consumerTag);
+                        // NoWait: o BasicCancel síncrono do RabbitMQ.Client 6.x pode lançar NullReferenceException
+                        // quando o CancelOk chega depois de o consumer já ter saído da tabela interna.
+                        _channel.BasicCancelNoWait(_consumerTag);
                     }
                 }
                 catch (Exception exception) when (exception is OperationInterruptedException or AlreadyClosedException)
