@@ -23,7 +23,18 @@ public class Repository<T> : IRepository<T> where T : class
     public virtual async Task AddAsync(T entity, CancellationToken cancellationToken = default) =>
         await DbSet.AddAsync(entity, cancellationToken);
 
-    public virtual void Update(T entity) => DbSet.Update(entity);
+    /// <summary>
+    /// Entidade carregada por este contexto já é rastreada e o EF detecta as mudanças sozinho; chamar
+    /// DbSet.Update nela marcaria filhos novos (ex.: histórico de status) como modificados e o UPDATE
+    /// falharia com DbUpdateConcurrencyException. Só anexamos entidades desanexadas.
+    /// </summary>
+    public virtual void Update(T entity)
+    {
+        if (Context.Entry(entity).State == EntityState.Detached)
+        {
+            DbSet.Update(entity);
+        }
+    }
 
     public virtual void Delete(T entity) => DbSet.Remove(entity);
 }

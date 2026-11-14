@@ -2,10 +2,9 @@ namespace Application.Common.Messaging;
 
 public interface ICommandConsumer
 {
-    Task<IAsyncDisposable> StartConsumingAsync<TCommand>(
+    Task<IAsyncDisposable> StartConsumingAsync(
         string queueName,
-        string routingKey,
-        Func<MessageEnvelope<TCommand>, CancellationToken, Task> handler,
-        CancellationToken cancellationToken = default)
-        where TCommand : class;
+        string commandType,
+        Func<IntegrationMessage, CancellationToken, Task> handler,
+        CancellationToken cancellationToken = default);
 }

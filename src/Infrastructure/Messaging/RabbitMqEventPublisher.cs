@@ -8,7 +8,6 @@ namespace Infrastructure.Messaging;
 
 public class RabbitMqEventPublisher : IEventPublisher
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly object _topologyLock = new();
     private readonly IRabbitMqConnectionProvider _connectionProvider;
     private readonly RabbitMqOptions _options;
@@ -20,30 +19,31 @@ public class RabbitMqEventPublisher : IEventPublisher
         _options = options.Value;
     }
 
-    public Task PublishAsync<TEvent>(
-        MessageEnvelope<TEvent> message,
-        string routingKey,
-        CancellationToken cancellationToken = default)
-        where TEvent : class
+    public Task PublishAsync(IntegrationMessage message, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_options.Enabled)
+        {
+            return Task.CompletedTask;
+        }
 
         using var channel = _connectionProvider.CreateChannel();
         EnsureTopology(channel);
 
-        var payload = JsonSerializer.Serialize(message, SerializerOptions);
+        var payload = JsonSerializer.Serialize(message, IntegrationMessage.SerializerOptions);
         var body = Encoding.UTF8.GetBytes(payload);
         var properties = channel.CreateBasicProperties();
         properties.ContentType = "application/json";
         properties.DeliveryMode = 2;
         properties.MessageId = message.MessageId.ToString();
-        properties.CorrelationId = message.CorrelationId.ToString();
-        properties.Type = message.EventType;
-        properties.Timestamp = new AmqpTimestamp(message.OccurredAt.ToUnixTimeSeconds());
+        properties.CorrelationId = message.CorrelationId;
+        properties.Type = message.Type;
+        properties.Timestamp = new AmqpTimestamp(new DateTimeOffset(DateTime.SpecifyKind(message.OccurredAtUtc, DateTimeKind.Utc)).ToUnixTimeSeconds());
 
         channel.BasicPublish(
             exchange: _options.ExchangeName,
-            routingKey: routingKey,
+            routingKey: message.Type,
             basicProperties: properties,
             body: body);
 

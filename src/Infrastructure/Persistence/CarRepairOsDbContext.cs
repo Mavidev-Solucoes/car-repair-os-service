@@ -31,6 +31,14 @@ public class CarRepairOsDbContext : DbContext, IUnitOfWork
         modelBuilder.ApplyConfiguration(new ServiceOrderConfiguration());
         modelBuilder.ApplyConfiguration(new ServiceOrderItemConfiguration());
         modelBuilder.ApplyConfiguration(new ServiceStatusHistoryConfiguration());
+
+        // Os ids são gerados pelo domínio (BaseEntity). Sem isso o EF supõe chave gerada pelo banco e trata
+        // filho novo com id preenchido como já existente, e o INSERT nunca acontece.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes()
+                     .Where(type => typeof(BaseEntity).IsAssignableFrom(type.ClrType)))
+        {
+            modelBuilder.Entity(entityType.ClrType).Property(nameof(BaseEntity.Id)).ValueGeneratedNever();
+        }
     }
 
     public async Task<int> CommitAsync(CancellationToken cancellationToken = default)
