@@ -52,16 +52,15 @@ jobs:
             --no-build \
             --logger "trx;LogFileName=test-results.trx" \
             --results-directory ./TestResults \
-            /p:CollectCoverage=true \
-            '/p:CoverletOutput=${{ github.workspace }}/TestResults/Coverage/$(MSBuildProjectName)/' \
-            /p:CoverletOutputFormat="opencover,cobertura"
+            --collect:"XPlat Code Coverage;Format=opencover,cobertura"
 
       - name: 4. Generate Code Coverage Report
         run: |
           dotnet tool install --global dotnet-reportgenerator-globaltool
           reportgenerator \
-            -reports:"TestResults/Coverage/**/coverage.cobertura.xml" \
+            -reports:"TestResults/**/coverage.cobertura.xml" \
             -targetdir:"TestResults/CoverageReport" \
+            -filefilters:"-**/Migrations/**" \
             -reporttypes:"Cobertura;TextSummary"
 
       - name: 4. Enforce minimum coverage (80%)
@@ -161,9 +160,7 @@ jobs:
             --no-build \
             --logger "trx;LogFileName=test-results.trx" \
             --results-directory ./TestResults \
-            /p:CollectCoverage=true \
-            '/p:CoverletOutput=${{ github.workspace }}/TestResults/Coverage/$(MSBuildProjectName)/' \
-            /p:CoverletOutputFormat="opencover"
+            --collect:"XPlat Code Coverage;Format=opencover"
 
       - name: SonarQube Analysis (quality gate)
         if: steps.sonar_mode.outputs.run == 'true'
