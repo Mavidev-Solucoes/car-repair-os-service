@@ -5,7 +5,7 @@ namespace Infrastructure.Messaging;
 
 public sealed class RabbitMqConnectionProvider : IRabbitMqConnectionProvider, IDisposable
 {
-    private readonly IConnection _connection;
+    private readonly Lazy<IConnection> _connection;
 
     public RabbitMqConnectionProvider(IOptions<RabbitMqOptions> options)
     {
@@ -17,16 +17,22 @@ public sealed class RabbitMqConnectionProvider : IRabbitMqConnectionProvider, ID
             UserName = settings.UserName,
             Password = settings.Password,
             VirtualHost = settings.VirtualHost,
-            DispatchConsumersAsync = true
+            DispatchConsumersAsync = true,
+            AutomaticRecoveryEnabled = true
         };
 
-        _connection = factory.CreateConnection();
+        // Conecta só no primeiro uso (com RabbitMq:Enabled=false nada abre conexão). PublicationOnly não guarda
+        // a exceção: se o RabbitMQ estiver fora, a próxima chamada tenta de novo.
+        _connection = new Lazy<IConnection>(() => factory.CreateConnection(), LazyThreadSafetyMode.PublicationOnly);
     }
 
-    public IModel CreateChannel() => _connection.CreateModel();
+    public IModel CreateChannel() => _connection.Value.CreateModel();
 
     public void Dispose()
     {
-        _connection.Dispose();
+        if (_connection.IsValueCreated)
+        {
+            _connection.Value.Dispose();
+        }
     }
 }

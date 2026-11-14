@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddSingleton<IRabbitMqConnectionProvider, RabbitMqConnectionProvider>();
         services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
         services.AddSingleton<ICommandConsumer, RabbitMqCommandConsumer>();
+        services.AddHostedService<SagaCommandsWorker>();
 
         services.AddDbContext<CarRepairOsDbContext>(options =>
             options.UseNpgsql(

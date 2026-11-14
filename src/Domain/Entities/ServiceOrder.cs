@@ -89,6 +89,50 @@ public class ServiceOrder : BaseEntity
         RaiseDomainEvent(new ServiceOrderClosedDomainEvent(Id, requestingUserId));
     }
 
+    /// <summary>
+    /// Encerramento pedido pela saga (CloseServiceOrderCommand). Não tem usuário; repetir não tem efeito.
+    /// </summary>
+    /// <returns>false se a OS já estava encerrada.</returns>
+    public bool CloseBySystem()
+    {
+        if (Status == ServiceStatus.Closed)
+        {
+            return false;
+        }
+
+        if (Status == ServiceStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Cancelled service orders cannot be closed.");
+        }
+
+        TransitionToStatus(ServiceStatus.Closed, null);
+        Touch();
+        RaiseDomainEvent(new ServiceOrderClosedDomainEvent(Id, Guid.Empty));
+        return true;
+    }
+
+    /// <summary>
+    /// Cancelamento pedido pela saga (CancelServiceOrderCommand, compensação). Não tem usuário; repetir não tem efeito.
+    /// </summary>
+    /// <returns>false se a OS já estava cancelada.</returns>
+    public bool CancelBySystem()
+    {
+        if (Status == ServiceStatus.Cancelled)
+        {
+            return false;
+        }
+
+        if (Status == ServiceStatus.Closed)
+        {
+            throw new InvalidOperationException("Closed service orders cannot be cancelled.");
+        }
+
+        TransitionToStatus(ServiceStatus.Cancelled, null);
+        Touch();
+        RaiseDomainEvent(new ServiceOrderCancelledDomainEvent(Id, Guid.Empty));
+        return true;
+    }
+
     private void EnsureCanModify(Guid requestingUserId)
     {
         if (Status is ServiceStatus.Cancelled or ServiceStatus.Closed)

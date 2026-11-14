@@ -1,9 +1,12 @@
 using System.Text;
 using System.Text.Json;
 using Application.Common.Messaging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 using System.Diagnostics;
 using System.Threading;
 
@@ -14,23 +17,27 @@ public class RabbitMqCommandConsumer : ICommandConsumer
     private const string RetryCountHeader = "x-retry-count";
     private const string RetrySuffix = ".retry";
     private const string DeadLetterSuffix = ".dlq";
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly IRabbitMqConnectionProvider _connectionProvider;
     private readonly RabbitMqOptions _options;
+    private readonly ILogger<RabbitMqCommandConsumer> _logger;
 
-    public RabbitMqCommandConsumer(IRabbitMqConnectionProvider connectionProvider, IOptions<RabbitMqOptions> options)
+    public RabbitMqCommandConsumer(
+        IRabbitMqConnectionProvider connectionProvider,
+        IOptions<RabbitMqOptions> options,
+        ILogger<RabbitMqCommandConsumer>? logger = null)
     {
+        _logger = logger ?? NullLogger<RabbitMqCommandConsumer>.Instance;
         _connectionProvider = connectionProvider;
         _options = options.Value;
     }
 
-    public Task<IAsyncDisposable> StartConsumingAsync<TCommand>(
+    public Task<IAsyncDisposable> StartConsumingAsync(
         string queueName,
-        string routingKey,
-        Func<MessageEnvelope<TCommand>, CancellationToken, Task> handler,
+        string commandType,
+        Func<IntegrationMessage, CancellationToken, Task> handler,
         CancellationToken cancellationToken = default)
-        where TCommand : class
     {
+        var routingKey = commandType;
         var linkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var processingToken = linkedCancellationTokenSource.Token;
         var channel = _connectionProvider.CreateChannel();
@@ -46,11 +53,7 @@ public class RabbitMqCommandConsumer : ICommandConsumer
 
             try
             {
-                var json = Encoding.UTF8.GetString(body);
-                var message = JsonSerializer.Deserialize<MessageEnvelope<TCommand>>(json, SerializerOptions)
-                    ?? throw new InvalidOperationException("Invalid RabbitMQ message payload.");
-
-                await handler(message, processingToken);
+                await handler(Deserialize(body), processingToken);
                 lock (channelLock)
                 {
                     channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
@@ -63,10 +66,20 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                     channel.BasicNack(eventArgs.DeliveryTag, multiple: false, requeue: true);
                 }
             }
-            catch
+            catch (Exception exception)
             {
                 var retryCount = GetRetryCount(eventArgs.BasicProperties.Headers);
-                var republished = retryCount < _options.MaxRetries
+                var willRetry = exception is not InvalidMessageException && retryCount < _options.MaxRetries;
+                _logger.Log(
+                    willRetry ? LogLevel.Warning : LogLevel.Error,
+                    exception,
+                    willRetry
+                        ? "Command {RoutingKey} failed; retry {Attempt}/{MaxRetries}."
+                        : "Command {RoutingKey} failed; sending to dead-letter queue after {Attempt} attempts.",
+                    routingKey,
+                    retryCount + 1,
+                    _options.MaxRetries);
+                var republished = willRetry
                     ? TryPublishToRetryExchange(channel, channelLock, body, eventArgs.BasicProperties, routingKey, retryCount + 1)
                     : TryPublishToDeadLetterExchange(channel, channelLock, body, eventArgs.BasicProperties, routingKey);
 
@@ -105,7 +118,7 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         var retryQueueName = GetRetryQueueName(queueName);
         var deadLetterQueueName = GetDeadLetterQueueName(queueName);
 
-        channel.ExchangeDeclare(_options.ExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
+        channel.ExchangeDeclare(_options.CommandsExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
         channel.ExchangeDeclare(retryExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
         channel.ExchangeDeclare(deadLetterExchangeName, ExchangeType.Topic, durable: true, autoDelete: false);
 
@@ -119,7 +132,7 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                 ["x-dead-letter-exchange"] = deadLetterExchangeName,
                 ["x-dead-letter-routing-key"] = routingKey
             });
-        channel.QueueBind(queue: queueName, exchange: _options.ExchangeName, routingKey: routingKey);
+        channel.QueueBind(queue: queueName, exchange: _options.CommandsExchangeName, routingKey: routingKey);
 
         channel.QueueDeclare(
             queue: retryQueueName,
@@ -129,7 +142,7 @@ public class RabbitMqCommandConsumer : ICommandConsumer
             arguments: new Dictionary<string, object>
             {
                 ["x-message-ttl"] = _options.RetryDelayMilliseconds,
-                ["x-dead-letter-exchange"] = _options.ExchangeName,
+                ["x-dead-letter-exchange"] = _options.CommandsExchangeName,
                 ["x-dead-letter-routing-key"] = routingKey
             });
         channel.QueueBind(queue: retryQueueName, exchange: retryExchangeName, routingKey: routingKey);
@@ -210,6 +223,26 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         }
     }
 
+    public static IntegrationMessage Deserialize(byte[] body)
+    {
+        IntegrationMessage? message;
+        try
+        {
+            message = JsonSerializer.Deserialize<IntegrationMessage>(body, IntegrationMessage.SerializerOptions);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidMessageException($"Message body is not a valid envelope: {exception.Message}");
+        }
+
+        if (message is null || string.IsNullOrWhiteSpace(message.Type) || string.IsNullOrWhiteSpace(message.CorrelationId))
+        {
+            throw new InvalidMessageException("Message envelope must have type and correlationId.");
+        }
+
+        return message;
+    }
+
     private static Dictionary<string, object> CloneHeaders(IDictionary<string, object>? headers)
     {
         return headers is null
@@ -233,9 +266,9 @@ public class RabbitMqCommandConsumer : ICommandConsumer
         };
     }
 
-    private string GetRetryExchangeName() => $"{_options.ExchangeName}.retry";
+    private string GetRetryExchangeName() => $"{_options.CommandsExchangeName}.retry";
 
-    private string GetDeadLetterExchangeName() => $"{_options.ExchangeName}.dlq";
+    private string GetDeadLetterExchangeName() => $"{_options.CommandsExchangeName}.dlx";
 
     private static string GetRetryQueueName(string queueName) => $"{queueName}{RetrySuffix}";
 
@@ -276,9 +309,18 @@ public class RabbitMqCommandConsumer : ICommandConsumer
 
             lock (_channelLock)
             {
-                if (_channel.IsOpen)
+                try
                 {
-                    _channel.BasicCancel(_consumerTag);
+                    if (_channel.IsOpen)
+                    {
+                        // NoWait: o BasicCancel síncrono do RabbitMQ.Client 6.x pode lançar NullReferenceException
+                        // quando o CancelOk chega depois de o consumer já ter saído da tabela interna.
+                        _channel.BasicCancelNoWait(_consumerTag);
+                    }
+                }
+                catch (Exception exception) when (exception is OperationInterruptedException or AlreadyClosedException)
+                {
+                    // O canal ou a conexão fecharam enquanto o serviço desligava: não há mais consumer a cancelar.
                 }
             }
 

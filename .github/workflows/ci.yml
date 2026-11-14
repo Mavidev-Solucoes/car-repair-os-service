@@ -52,16 +52,15 @@ jobs:
             --no-build \
             --logger "trx;LogFileName=test-results.trx" \
             --results-directory ./TestResults \
-            /p:CollectCoverage=true \
-            '/p:CoverletOutput=${{ github.workspace }}/TestResults/Coverage/$(MSBuildProjectName)/' \
-            /p:CoverletOutputFormat="opencover,cobertura"
+            --collect:"XPlat Code Coverage;Format=opencover,cobertura"
 
       - name: 4. Generate Code Coverage Report
         run: |
           dotnet tool install --global dotnet-reportgenerator-globaltool
           reportgenerator \
-            -reports:"TestResults/Coverage/**/coverage.cobertura.xml" \
+            -reports:"TestResults/**/coverage.cobertura.xml" \
             -targetdir:"TestResults/CoverageReport" \
+            -filefilters:"-**/Migrations/**" \
             -reporttypes:"Cobertura;TextSummary"
 
       - name: 4. Enforce minimum coverage (80%)
@@ -72,19 +71,19 @@ jobs:
           fi
 
           python3 - <<'PY'
-import os
-import xml.etree.ElementTree as ET
+          import os
+          import xml.etree.ElementTree as ET
 
-threshold = float(os.environ["COVERAGE_THRESHOLD"])
-report_path = "TestResults/CoverageReport/Cobertura.xml"
+          threshold = float(os.environ["COVERAGE_THRESHOLD"])
+          report_path = "TestResults/CoverageReport/Cobertura.xml"
 
-line_rate = float(ET.parse(report_path).getroot().attrib.get("line-rate", 0.0))
-coverage = line_rate * 100
+          line_rate = float(ET.parse(report_path).getroot().attrib.get("line-rate", 0.0))
+          coverage = line_rate * 100
 
-print(f"Computed line coverage: {coverage:.2f}%")
-if coverage < threshold:
-    raise SystemExit(f"Coverage {coverage:.2f}% is below threshold {threshold:.2f}%")
-PY
+          print(f"Computed line coverage: {coverage:.2f}%")
+          if coverage < threshold:
+              raise SystemExit(f"Coverage {coverage:.2f}% is below threshold {threshold:.2f}%")
+          PY
 
   sonar:
     name: 5. SonarQube Analysis
@@ -147,7 +146,8 @@ PY
             /d:sonar.host.url="${{ env.SONAR_HOST_URL }}" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.cs.vstest.reportsPaths="TestResults/**/*.trx" \
-            /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
+            /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml" \
+            /d:sonar.coverage.exclusions="**/Migrations/**"
 
       - name: Build for Sonar analysis
         if: steps.sonar_mode.outputs.run == 'true'
@@ -161,9 +161,7 @@ PY
             --no-build \
             --logger "trx;LogFileName=test-results.trx" \
             --results-directory ./TestResults \
-            /p:CollectCoverage=true \
-            '/p:CoverletOutput=${{ github.workspace }}/TestResults/Coverage/$(MSBuildProjectName)/' \
-            /p:CoverletOutputFormat="opencover"
+            --collect:"XPlat Code Coverage;Format=opencover"
 
       - name: SonarQube Analysis (quality gate)
         if: steps.sonar_mode.outputs.run == 'true'
