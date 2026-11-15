@@ -54,3 +54,9 @@ The CD workflow in `.github/workflows/cd.yml` publishes Docker images to GHCR us
 
 - No additional repository secret is required for GHCR publish in the same repository.
 - Ensure workflow permissions allow `packages: write` (already configured in `cd.yml`).
+
+## Observabilidade (New Relic)
+
+A imagem traz o agente .NET do New Relic com o profiler desligado; no Kubernetes o ConfigMap liga o agente (`NEW_RELIC_APP_NAME=car-repair-os-service`) e a license vem do Secret opcional `newrelic-license`.
+
+O trace distribuído atravessa o RabbitMQ: `MessageTracing` grava `traceparent`/`tracestate` (W3C) e os headers do New Relic em cada mensagem publicada e, no consumo, abre a transação `RabbitMQ/<tipo>` que continua o trace de quem publicou, com o atributo `correlationId` (id da OS). Detalhes e consultas NRQL no README do `car-repair-k8s-infra`, seção "Observabilidade: New Relic APM e trace distribuído".
