@@ -40,6 +40,8 @@ public class RabbitMqEventPublisher : IEventPublisher
         properties.CorrelationId = message.CorrelationId;
         properties.Type = message.Type;
         properties.Timestamp = new AmqpTimestamp(new DateTimeOffset(DateTime.SpecifyKind(message.OccurredAtUtc, DateTimeKind.Utc)).ToUnixTimeSeconds());
+        properties.Headers ??= new Dictionary<string, object>();
+        MessageTracing.Inject(properties.Headers);
 
         channel.BasicPublish(
             exchange: _options.ExchangeName,

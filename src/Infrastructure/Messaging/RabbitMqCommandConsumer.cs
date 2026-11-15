@@ -53,7 +53,12 @@ public class RabbitMqCommandConsumer : ICommandConsumer
 
             try
             {
-                await handler(Deserialize(body), processingToken);
+                var message = Deserialize(body);
+                await MessageTracing.ConsumeAsync(
+                    message.Type,
+                    message.CorrelationId,
+                    eventArgs.BasicProperties?.Headers,
+                    () => handler(message, processingToken));
                 lock (channelLock)
                 {
                     channel.BasicAck(eventArgs.DeliveryTag, multiple: false);
