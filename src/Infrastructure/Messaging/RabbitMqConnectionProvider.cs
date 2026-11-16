@@ -32,7 +32,7 @@ public sealed class RabbitMqConnectionProvider : IRabbitMqConnectionProvider, ID
     {
         if (_connection.IsValueCreated)
         {
-            _connection.Value.Dispose();
+            RabbitMqCommandConsumer.DisposeQuietly(_connection.Value);
         }
     }
 }
