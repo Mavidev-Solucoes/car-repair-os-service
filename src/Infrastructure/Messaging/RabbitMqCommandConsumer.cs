@@ -279,6 +279,24 @@ public class RabbitMqCommandConsumer : ICommandConsumer
 
     private static string GetDeadLetterQueueName(string queueName) => $"{queueName}{DeadLetterSuffix}";
 
+    /// <summary>
+    /// Descarta um canal ou conexão no desligamento. O RabbitMQ.Client 6.x pode lançar NullReferenceException,
+    /// AlreadyClosedException ou OperationInterruptedException ao fechar um canal/conexão que o broker ou a
+    /// recuperação automática já está fechando; nesse momento não há mais nada a liberar.
+    /// </summary>
+    public static void DisposeQuietly(IDisposable resource)
+    {
+        try
+        {
+            resource.Dispose();
+        }
+        catch (Exception exception) when (exception is NullReferenceException or AlreadyClosedException
+                                              or OperationInterruptedException or IOException)
+        {
+            // Já está fechado (ou fechando): ignorar no desligamento.
+        }
+    }
+
     private sealed class RabbitMqConsumerSubscription : IAsyncDisposable
     {
         private readonly IModel _channel;
@@ -336,7 +354,7 @@ public class RabbitMqCommandConsumer : ICommandConsumer
                 Thread.Sleep(50);
             }
 
-            _channel.Dispose();
+            DisposeQuietly(_channel);
             _cancellationTokenSource.Dispose();
             return ValueTask.CompletedTask;
         }
