@@ -60,3 +60,25 @@ The CD workflow in `.github/workflows/cd.yml` publishes Docker images to GHCR us
 A imagem traz o agente .NET do New Relic com o profiler desligado; no Kubernetes o ConfigMap liga o agente (`NEW_RELIC_APP_NAME=car-repair-os-service`) e a license vem do Secret opcional `newrelic-license`.
 
 O trace distribuído atravessa o RabbitMQ: `MessageTracing` grava `traceparent`/`tracestate` (W3C) e os headers do New Relic em cada mensagem publicada e, no consumo, abre a transação `RabbitMQ/<tipo>` que continua o trace de quem publicou, com o atributo `correlationId` (id da OS). Detalhes e consultas NRQL no README do `car-repair-k8s-infra`, seção "Observabilidade: New Relic APM e trace distribuído".
+
+## Evidências de testes e cobertura — FIAP Fase 4
+
+- **Cobertura de linhas:** **94,06%**, acima do mínimo de **80%** solicitado pela FIAP, medida na execução de CI da branch `main` em **15/11/2026**.
+- **Evidência de cobertura e qualidade:** [GitHub Actions CI — build, testes, cobertura, SonarCloud e Docker aprovados](https://github.com/Mavidev-Solucoes/car-repair-os-service/actions/runs/43689845445).
+- **Testes automatizados:** `tests/Domain.UnitTests` e `tests/Api.IntegrationTests`.
+- **Evidência de integração entre serviços:** [E2E Kubernetes (kind) — fluxo completo e compensações da Saga](https://github.com/Mavidev-Solucoes/car-repair-k8s-infra/actions/runs/43935058397).
+
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) aplica o limite de 80% e executa a análise SonarCloud quando disponível. O percentual acima é o resultado da execução vinculada, não uma garantia para futuros commits.
+
+## Papel na Saga da ordem de serviço
+
+Este microsserviço é responsável pela abertura, histórico e estado da OS, com persistência própria em PostgreSQL. Ao abrir uma OS, publica `ServiceOrderOpened` no RabbitMQ. O [orquestrador](https://github.com/Mavidev-Solucoes/car-repair-saga-orchestrator) coordena orçamento, pagamento e execução; ao final, o OS Service consome `CloseServiceOrderCommand`, ou `CancelServiceOrderCommand` se houver compensação, atualizando o estado local.
+
+A divisão de responsabilidades, os eventos, comandos e a correlação por ID da OS estão descritos no [contrato de mensageria](docs/contrato-mensageria.md). O serviço não consulta diretamente os bancos dos demais microsserviços.
+
+## Entrega e API
+
+- [Dockerfile](src/Api/Dockerfile), [manifests Kubernetes](k8s/base) e [workflows independentes de CI/CD](.github/workflows) acompanham o código.
+- A API disponibiliza Swagger/OpenAPI em ambiente de desenvolvimento.
+- A plataforma e os cenários end-to-end são documentados no [repositório de Kubernetes](https://github.com/Mavidev-Solucoes/car-repair-k8s-infra).
+
